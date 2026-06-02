@@ -318,9 +318,6 @@ public import Physlib.Relativity.Special.ProperTime
 public import Physlib.Relativity.Special.TwinParadox.Basic
 public import Physlib.Relativity.SpeedOfLight
 public import Physlib.Relativity.Tensors.Basic
-public import Physlib.Relativity.Tensors.Color.Basic
-public import Physlib.Relativity.Tensors.Color.Discrete
-public import Physlib.Relativity.Tensors.Color.Lift
 public import Physlib.Relativity.Tensors.ComplexTensor.Basic
 public import Physlib.Relativity.Tensors.ComplexTensor.Lemmas
 public import Physlib.Relativity.Tensors.ComplexTensor.Matrix.Pre

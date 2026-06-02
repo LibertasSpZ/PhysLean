@@ -52,7 +52,6 @@ field strength matrix. This is an antisymmetric matrix.
 
 namespace Electromagnetism
 open Module realLorentzTensor
-open IndexNotation
 open TensorSpecies
 open Tensor
 

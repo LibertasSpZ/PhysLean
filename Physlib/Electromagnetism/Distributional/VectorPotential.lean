@@ -40,7 +40,6 @@ the vector potential is non-relativistic and is therefore a distribution of `Tim
 
 namespace Electromagnetism
 open Module realLorentzTensor
-open IndexNotation
 open TensorSpecies
 open Tensor
 
