@@ -1,85 +1,61 @@
 /-
-Copyright (c) 2025 Joseph Tooby-Smith. All rights reserved.
+Copyright (c) 2026 Shaopeng Zhu. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
-Authors: Joseph Tooby-Smith
+Authors: Shaopeng Zhu
 -/
 module
 
-public import Physlib.SpaceAndTime.Space.Basic
-public import Mathlib.Analysis.Normed.Affine.Isometry
-public import Mathlib.LinearAlgebra.UnitaryGroup
+public import Mathlib.Analysis.InnerProductSpace.PiL2
 
 /-!
 # Euclidean group
 
 This file defines the Euclidean group as translations composed with orthogonal maps, together
-with the special Euclidean group, translation subgroup, rotation subgroups, and the inclusion of the
-Euclidean group into the affine group.
+with the special Euclidean group, translation subgroup, and rotation subgroups.
+
+The affine group, together with the inclusion of the Euclidean group into it, is defined in
+`Physlib.SpaceAndTime.Space.EuclideanGroup.AffineGroup`.
 -/
+
+@[expose] public section
 
 /-- An n-dimensional `Euclidean group` is a group of
 rotations, reflections, and translations.
 -/
 @[ext]
 structure EuclideanGroup (n : ℕ) where
+  /-- The translation part of a Euclidean transformation. -/
   translation : EuclideanSpace ℝ (Fin n)
+  /-- The orthogonal linear part of a Euclidean transformation. -/
   linear : Matrix.orthogonalGroup (Fin n) ℝ
 
-/-- Action of an orthogonal-group element on a Euclidean vector,
-bridged through `WithLp`. -/
-private def act {n : ℕ} (Q : Matrix.orthogonalGroup (Fin n) ℝ)
-    (v : EuclideanSpace ℝ (Fin n)) : EuclideanSpace ℝ (Fin n) :=
-  WithLp.toLp 2 (Q.val.mulVec v.ofLp)
-
-private lemma act_mul {n : ℕ} (Q Q' : Matrix.orthogonalGroup (Fin n) ℝ)
-    (v : EuclideanSpace ℝ (Fin n)) : act (Q * Q') v = act Q (act Q' v) := by
-  ext i
-  simp [act, ← Matrix.mulVec_mulVec]
-
-private lemma act_add {n : ℕ} (Q : Matrix.orthogonalGroup (Fin n) ℝ)
-    (u v : EuclideanSpace ℝ (Fin n)) : act Q (u + v) = act Q u + act Q v := by
-  ext i
-  simp [act, Matrix.mulVec_add]
-
-private lemma act_one {n : ℕ} (v : EuclideanSpace ℝ (Fin n)) : act 1 v = v := by
-  ext i
-  simp [act]
-
-private lemma act_zero {n : ℕ} (Q : Matrix.orthogonalGroup (Fin n) ℝ) :
-    act Q 0 = 0 := by
-  ext i
-  simp [act]
-
-private lemma act_neg {n : ℕ} (Q : Matrix.orthogonalGroup (Fin n) ℝ)
-    (v : EuclideanSpace ℝ (Fin n)) : act Q (-v) = -act Q v := by
-  ext i
-  simp [act, Matrix.mulVec_neg]
-
-/-- Group structure on E(n) is determined by Translations ⋊ Orthogonal. -/
+/-- Group structure on `E(n) = ℝ^n ⋊ O(n)`. The orthogonal component acts on translations by
+the inherited matrix-vector action on `EuclideanSpace ℝ (Fin n)`, transported through `WithLp`
+from the coordinate action `Q.val *ᵥ v.ofLp`. -/
 noncomputable instance : Group (EuclideanGroup n) where
-  mul A B := ⟨A.translation + act A.linear B.translation, A.linear * B.linear⟩
+  mul A B := ⟨A.translation + A.linear • B.translation, A.linear * B.linear⟩
   mul_assoc A B C := by
     refine EuclideanGroup.ext ?_ ?_
-    · show A.translation + act A.linear B.translation + act (A.linear * B.linear) C.translation
-        = A.translation + act A.linear (B.translation + act B.linear C.translation)
-      rw [act_mul, act_add, add_assoc]
+    · show A.translation + A.linear • B.translation + (A.linear * B.linear) • C.translation
+        = A.translation + A.linear • (B.translation + B.linear • C.translation)
+      rw [mul_smul, smul_add, add_assoc]
     · exact mul_assoc A.linear B.linear C.linear
   one := ⟨0, 1⟩
   one_mul A := by
     refine EuclideanGroup.ext ?_ ?_
-    · show 0 + act 1 A.translation = A.translation
-      rw [zero_add, act_one]
+    · show 0 + (1 : Matrix.orthogonalGroup (Fin n) ℝ) • A.translation = A.translation
+      rw [zero_add, one_smul]
     · exact one_mul A.linear
   mul_one A := by
     refine EuclideanGroup.ext ?_ ?_
-    · show A.translation + act A.linear 0 = A.translation
-      rw [act_zero, add_zero]
+    · show A.translation + A.linear • 0 = A.translation
+      rw [smul_zero, add_zero]
     · exact mul_one A.linear
-  inv A := ⟨act A.linear⁻¹ (-A.translation), A.linear⁻¹⟩
+  inv A := ⟨A.linear⁻¹ • (-A.translation), A.linear⁻¹⟩
   inv_mul_cancel A := by
     refine EuclideanGroup.ext ?_ ?_
-    · show act A.linear⁻¹ (-A.translation) + act A.linear⁻¹ A.translation = 0
-      rw [act_neg, neg_add_cancel]
+    · show A.linear⁻¹ • (-A.translation) + A.linear⁻¹ • A.translation = 0
+      rw [← smul_add, neg_add_cancel, smul_zero]
     · exact inv_mul_cancel A.linear
 
 private lemma det_coe_inv {n : ℕ} (Q : Matrix.orthogonalGroup (Fin n) ℝ) :
@@ -95,7 +71,7 @@ private lemma coe_inv {n : ℕ} (Q : Matrix.orthogonalGroup (Fin n) ℝ) :
   rw [← Submonoid.coe_mul, mul_inv_cancel, OneMemClass.coe_one]
 
 /-- Special Euclidean Group is the subgroup with det(Q) = 1 where Q ∈ O(n) -/
-def specialEuclideanGroup (n : ℕ) : Subgroup (EuclideanGroup n) where
+def SpecialEuclideanGroup (n : ℕ) : Subgroup (EuclideanGroup n) where
   carrier := {g | g.linear.val.det = 1}
   mul_mem' {a b} ha hb := by
     show (a.linear * b.linear).val.det = 1
@@ -108,11 +84,11 @@ def specialEuclideanGroup (n : ℕ) : Subgroup (EuclideanGroup n) where
     rw [det_coe_inv, ha, inv_one]
 
 /-- The inclusion of the special Euclidean group into the Euclidean group. -/
-noncomputable def specialEuclideanGroup.incl (n : ℕ) :
-    specialEuclideanGroup n →* EuclideanGroup n := (specialEuclideanGroup n).subtype
+noncomputable def SpecialEuclideanGroup.incl (n : ℕ) :
+    SpecialEuclideanGroup n →* EuclideanGroup n := (SpecialEuclideanGroup n).subtype
 
 /-- Translation is the subgroup with Q = 1. -/
-def translationGroup (n : ℕ) : Subgroup (EuclideanGroup n) where
+def TranslationGroup (n : ℕ) : Subgroup (EuclideanGroup n) where
   carrier := {g | g.linear.val = 1}
   mul_mem' {a b} ha hb := by
     show (a.linear * b.linear).val = 1
@@ -125,8 +101,8 @@ def translationGroup (n : ℕ) : Subgroup (EuclideanGroup n) where
     rw [coe_inv, ha, inv_one]
 
 /-- The inclusion of the translation subgroup into the Euclidean group. -/
-noncomputable def translationGroup.incl (n : ℕ) :
-    translationGroup n →* EuclideanGroup n := (translationGroup n).subtype
+noncomputable def TranslationGroup.incl (n : ℕ) :
+    TranslationGroup n →* EuclideanGroup n := (TranslationGroup n).subtype
 
 /-- MonoidHom including a translation vector into the Euclidean Group. -/
 def translationVector.incl (n : ℕ) :
@@ -135,14 +111,16 @@ def translationVector.incl (n : ℕ) :
   map_one' := by rfl
   map_mul' x y := by
     refine EuclideanGroup.ext ?_ ?_
-    · show Multiplicative.toAdd (x * y) = Multiplicative.toAdd x + act 1 (Multiplicative.toAdd y)
-      simp [act_one]
+    · show Multiplicative.toAdd (x * y) =
+        Multiplicative.toAdd x +
+          (1 : Matrix.orthogonalGroup (Fin n) ℝ) • Multiplicative.toAdd y
+      simp
     · show 1 = 1 * 1
       simp [mul_one]
 
-/-- An API feature: the translation vector inclusion image is the translationGroup carrier. -/
+/-- An API feature: the translation vector inclusion image is the `TranslationGroup` carrier. -/
 lemma translationVector.incl_range :
-    Set.range (@translationVector.incl n) = (translationGroup n : Set (EuclideanGroup n)) := by
+    Set.range (@translationVector.incl n) = (TranslationGroup n : Set (EuclideanGroup n)) := by
   ext g
   constructor
   · rintro ⟨v, hv⟩
@@ -164,20 +142,20 @@ lemma translation_zero : translationVector.incl n
 
 /-- The subgroup of `EuclideanGroup n` whose elements fix the origin
 (translation = 0). This is the copy of `O(n)` sitting inside `E(n)`. -/
-def originStabilizer (n : ℕ) : Subgroup (EuclideanGroup n) where
+def OriginStabilizer (n : ℕ) : Subgroup (EuclideanGroup n) where
   carrier := {g | g.translation = 0}
   mul_mem' {a b} ha hb := by
-    show a.translation + act a.linear b.translation = 0
-    rw [ha, hb, act_zero, zero_add]
+    show a.translation + a.linear • b.translation = 0
+    rw [ha, hb, smul_zero, zero_add]
   one_mem' := rfl
   inv_mem' {a} ha := by
-    show act a.linear⁻¹ (-a.translation) = 0
-    rw [ha, neg_zero, act_zero]
+    show a.linear⁻¹ • (-a.translation) = 0
+    rw [ha, neg_zero, smul_zero]
 
 /-- Rotation Group is the subgroup of E(n) consisting of rotations about the origin:
 elements with `det = 1` (orientation-preserving) and `translation = 0` (origin-fixing). -/
 noncomputable def RotationGroup (n : ℕ) : Subgroup (EuclideanGroup n) :=
-  specialEuclideanGroup n ⊓ originStabilizer n
+  SpecialEuclideanGroup n ⊓ OriginStabilizer n
 
 /-- The inclusion of the rotation subgroup into the Euclidean group. -/
 noncomputable def RotationGroup.incl (n : ℕ) :
@@ -185,10 +163,10 @@ noncomputable def RotationGroup.incl (n : ℕ) :
 
 variable {n} (p : EuclideanSpace ℝ (Fin n))
 /-- The subgroup of rotation about a spatial point `p : EuclideanSpace ℝ (Fin n)` consists of
-elements of the form T(p) * r * T(-p) with T(·): translationVector.incl n (Multiplicative.ofAdd ·)
+elements of the form T(p) * r * T(-p) with T(·) : translationVector.incl n (Multiplicative.ofAdd ·)
 and r : RotationGroup where r is viewed as a rotation about the origin. Note T(-p) = T(p)⁻¹.
 -/
-noncomputable def rotationsAbout : Subgroup (EuclideanGroup n) where
+noncomputable def RotationsAbout : Subgroup (EuclideanGroup n) where
   carrier := {g | ∃ r : RotationGroup n, g = translationVector.incl n (Multiplicative.ofAdd p)
     * (r : EuclideanGroup n) * translationVector.incl n (Multiplicative.ofAdd (-p))}
   mul_mem' {a b} ha hb := by
@@ -209,18 +187,17 @@ noncomputable def rotationsAbout : Subgroup (EuclideanGroup n) where
     simp [mul_inv_rev, mul_assoc]
 
 /-- The inclusion of rotations about `p` into the Euclidean group. -/
-noncomputable def rotationsAbout.incl : rotationsAbout p →* EuclideanGroup n :=
-  (rotationsAbout p).subtype
+noncomputable def RotationsAbout.incl : RotationsAbout p →* EuclideanGroup n :=
+  (RotationsAbout p).subtype
 
 /-- Conjugate a rotation about `p` back to a rotation about the origin. -/
-noncomputable def rotationsAbout.toOrigin :
-    rotationsAbout p →* RotationGroup n where
+noncomputable def RotationsAbout.toOrigin :
+    RotationsAbout p →* RotationGroup n where
   toFun g := ⟨translationVector.incl n (Multiplicative.ofAdd (-p))
     * (g : EuclideanGroup n) * translationVector.incl n (Multiplicative.ofAdd p), by
       obtain ⟨g, hg⟩ := g
       obtain ⟨r, hr⟩ := hg
-      simp; rw [hr]; simp [mul_assoc]
-      ⟩
+      simp; rw [hr]; simp [mul_assoc]⟩
   map_one' := by simp
   map_mul' := by
     intro x y
@@ -234,11 +211,10 @@ noncomputable def rotationsAbout.toOrigin :
     simp [mul_assoc]
 
 /-- Conjugate a rotation about the origin to a rotation about `p`. -/
-noncomputable def rotationsAbout.fromOrigin :
-    RotationGroup n →* rotationsAbout p where
+noncomputable def RotationsAbout.fromOrigin :
+    RotationGroup n →* RotationsAbout p where
   toFun g := ⟨translationVector.incl n (Multiplicative.ofAdd p)
-    * (g : EuclideanGroup n) * translationVector.incl n (Multiplicative.ofAdd (-p)), by use g
-      ⟩
+    * (g : EuclideanGroup n) * translationVector.incl n (Multiplicative.ofAdd (-p)), by use g⟩
   map_one' := by simp
   map_mul' := by
     intro x y
@@ -248,36 +224,40 @@ noncomputable def rotationsAbout.fromOrigin :
     obtain ⟨r2, hr2⟩ := hb
     simp
 
-private lemma rotationsAbout_forward_identity :
-    (rotationsAbout.fromOrigin p).comp (rotationsAbout.toOrigin p) =
-      MonoidHom.id (rotationsAbout p) := by
+/-- `RotationsAbout.toOrigin p` followed by `RotationsAbout.fromOrigin p` is the identity; the
+forward leg of the isomorphism `RotationsAboutEquiv`. -/
+lemma RotationsAbout_forward_identity :
+    (RotationsAbout.fromOrigin p).comp (RotationsAbout.toOrigin p) =
+      MonoidHom.id (RotationsAbout p) := by
   apply MonoidHom.ext
   intro x
   apply Subtype.ext
   simp only [MonoidHom.coe_comp, Function.comp_apply, MonoidHom.id_apply, SetLike.coe_eq_coe]
-  unfold rotationsAbout.toOrigin
-  unfold rotationsAbout.fromOrigin
+  unfold RotationsAbout.toOrigin
+  unfold RotationsAbout.fromOrigin
   simp [mul_assoc]
 
-private lemma rotationsAbout_backward_identity :
-    (rotationsAbout.toOrigin p).comp (rotationsAbout.fromOrigin p) =
+/-- `RotationsAbout.fromOrigin p` followed by `RotationsAbout.toOrigin p` is the identity; the
+backward leg of the isomorphism `RotationsAboutEquiv`. -/
+lemma RotationsAbout_backward_identity :
+    (RotationsAbout.toOrigin p).comp (RotationsAbout.fromOrigin p) =
       MonoidHom.id (RotationGroup n) := by
   apply MonoidHom.ext
   intro x
   apply Subtype.ext
   simp only [MonoidHom.coe_comp, Function.comp_apply, MonoidHom.id_apply, SetLike.coe_eq_coe]
-  unfold rotationsAbout.toOrigin
-  unfold rotationsAbout.fromOrigin
+  unfold RotationsAbout.toOrigin
+  unfold RotationsAbout.fromOrigin
   simp [mul_assoc]
 
 /-- API feature: conjugation by the translation `T(p)` exhibits the rotations about `p` as
 isomorphic to the rotations about the origin `RotationGroup n`. -/
-noncomputable def rotationsAboutEquiv : rotationsAbout p ≃* RotationGroup n :=
-  MonoidHom.toMulEquiv (rotationsAbout.toOrigin p) (rotationsAbout.fromOrigin p)
-    (rotationsAbout_forward_identity p) (rotationsAbout_backward_identity p)
+noncomputable def RotationsAboutEquiv : RotationsAbout p ≃* RotationGroup n :=
+  MonoidHom.toMulEquiv (RotationsAbout.toOrigin p) (RotationsAbout.fromOrigin p)
+    (RotationsAbout_forward_identity p) (RotationsAbout_backward_identity p)
 
-/-- API feature: the degenerate identity that `rotationsAbout 0 = RotationGroup n` -/
-lemma rotationsAbout_zero : rotationsAbout (0 : EuclideanSpace ℝ (Fin n)) = RotationGroup n := by
+/-- API feature: the degenerate identity that `RotationsAbout 0 = RotationGroup n` -/
+lemma RotationsAbout_zero : RotationsAbout (0 : EuclideanSpace ℝ (Fin n)) = RotationGroup n := by
   apply Subgroup.ext
   intro g
   constructor
@@ -323,48 +303,52 @@ lemma ofRotationTranslation.decompose (Q : Matrix.specialOrthogonalGroup (Fin n)
     (EuclideanGroup.ofRotationTranslation Q t) =
     (translationVector.incl n (Multiplicative.ofAdd t)) * (EuclideanGroup.ofRotation (Q)) := by
   refine EuclideanGroup.ext ?_ ?_
-  · show t = t + act 1 0
-    rw [act_zero, add_zero]
+  · show t = t + (1 : Matrix.orthogonalGroup (Fin n) ℝ) • 0
+    rw [smul_zero, add_zero]
   · show specialOrthogonal.incl n Q = 1 * specialOrthogonal.incl n Q
     rw [one_mul]
 
 /-- The isomorphism's forward map: a special orthogonal matrix as a rotation about the origin. -/
-noncomputable def specialOrthogonal.toRotation (n : ℕ):
+noncomputable def specialOrthogonal.toRotation (n : ℕ) :
     Matrix.specialOrthogonalGroup (Fin n) ℝ →* RotationGroup n where
   toFun g := ⟨EuclideanGroup.ofRotation g, by
       refine ⟨?_, ?_⟩
       · show (EuclideanGroup.ofRotation g).linear.val.det = 1
         exact (Matrix.mem_specialOrthogonalGroup_iff.mp g.property).right
       · show (EuclideanGroup.ofRotation g).translation = 0
-        rfl
-      ⟩
+        rfl⟩
   map_one' := rfl
   map_mul' x y := by
     apply Subtype.ext
     refine EuclideanGroup.ext ?_ ?_
-    · show (0 : EuclideanSpace ℝ (Fin n)) = 0 + act (specialOrthogonal.incl n x) 0
-      rw [act_zero, add_zero]
+    · show (0 : EuclideanSpace ℝ (Fin n)) =
+        0 + (specialOrthogonal.incl n x : Matrix.orthogonalGroup (Fin n) ℝ) • 0
+      rw [smul_zero, add_zero]
     · show specialOrthogonal.incl n (x * y)
           = specialOrthogonal.incl n x * specialOrthogonal.incl n y
       rw [map_mul]
 
 /-- The isomorphism's inverse map: the linear part of a rotation about the origin, as a special
 orthogonal matrix. -/
-noncomputable def specialOrthogonal.fromRotation (n : ℕ):
+noncomputable def specialOrthogonal.fromRotation (n : ℕ) :
     RotationGroup n →* Matrix.specialOrthogonalGroup (Fin n) ℝ where
   toFun g := ⟨g.val.linear, ⟨g.val.linear.property,(g.property).left⟩⟩
   map_one' := rfl
   map_mul' _ _ := rfl
 
-private lemma specialOrthogonal_forward_identity :
+/-- `specialOrthogonal.toRotation n` followed by `specialOrthogonal.fromRotation n` is the identity;
+the forward leg of the isomorphism `specialOrthogonalEquiv`. -/
+lemma specialOrthogonal_forward_identity :
     (specialOrthogonal.fromRotation n).comp (specialOrthogonal.toRotation n) =
       MonoidHom.id (Matrix.specialOrthogonalGroup (Fin n) ℝ) := by
   apply MonoidHom.ext
   intro x
   rfl
 
-private lemma specialOrthogonal_backward_identity :
-     (specialOrthogonal.toRotation n).comp (specialOrthogonal.fromRotation n) =
+/-- `specialOrthogonal.fromRotation n` followed by `specialOrthogonal.toRotation n` is the identity;
+the backward leg of the isomorphism `specialOrthogonalEquiv`. -/
+lemma specialOrthogonal_backward_identity :
+    (specialOrthogonal.toRotation n).comp (specialOrthogonal.fromRotation n) =
       MonoidHom.id (RotationGroup n) := by
   apply MonoidHom.ext
   intro x
@@ -380,108 +364,3 @@ noncomputable def specialOrthogonalEquiv :
     Matrix.specialOrthogonalGroup (Fin n) ℝ ≃* RotationGroup n :=
     MonoidHom.toMulEquiv (specialOrthogonal.toRotation n) (specialOrthogonal.fromRotation n)
     (specialOrthogonal_forward_identity) (specialOrthogonal_backward_identity)
-
-/-- An n-dimensional `Affine group` is the group of invertible affine transformations:
-translations composed with general linear maps. -/
-@[ext]
-structure AffineGroup (n : ℕ) where
-  translation : EuclideanSpace ℝ (Fin n)
-  linear : Matrix.GeneralLinearGroup (Fin n) ℝ
-
-/-- Action of a general-linear-group element on a Euclidean vector,
-bridged through `WithLp`. -/
-private def act_affine {n : ℕ} (Q : Matrix.GeneralLinearGroup (Fin n) ℝ)
-    (v : EuclideanSpace ℝ (Fin n)) : EuclideanSpace ℝ (Fin n) :=
-  WithLp.toLp 2 (Q.val.mulVec v.ofLp)
-
-private lemma act_affine_mul {n : ℕ} (Q Q' : Matrix.GeneralLinearGroup (Fin n) ℝ)
-    (v : EuclideanSpace ℝ (Fin n)) : act_affine (Q * Q') v = act_affine Q (act_affine Q' v) := by
-  ext i
-  simp [act_affine, ← Matrix.mulVec_mulVec]
-
-private lemma act_affine_add {n : ℕ} (Q : Matrix.GeneralLinearGroup (Fin n) ℝ)
-    (u v : EuclideanSpace ℝ (Fin n)) :
-    act_affine Q (u + v) = act_affine Q u + act_affine Q v := by
-  ext i
-  simp [act_affine, Matrix.mulVec_add]
-
-private lemma act_affine_one {n : ℕ} (v : EuclideanSpace ℝ (Fin n)) : act_affine 1 v = v := by
-  ext i
-  simp [act_affine]
-
-private lemma act_affine_zero {n : ℕ} (Q : Matrix.GeneralLinearGroup (Fin n) ℝ) :
-    act_affine Q 0 = 0 := by
-  ext i
-  simp [act_affine]
-
-private lemma act_affine_neg {n : ℕ} (Q : Matrix.GeneralLinearGroup (Fin n) ℝ)
-    (v : EuclideanSpace ℝ (Fin n)) : act_affine Q (-v) = -act_affine Q v := by
-  ext i
-  simp [act_affine, Matrix.mulVec_neg]
-
-/-- Group structure on Aff(n) is determined by Translations ⋊ GeneralLinear. -/
-noncomputable instance : Group (AffineGroup n) where
-  mul A B := ⟨A.translation + act_affine A.linear B.translation, A.linear * B.linear⟩
-  mul_assoc A B C := by
-    refine AffineGroup.ext ?_ ?_
-    · show A.translation + act_affine A.linear B.translation
-          + act_affine (A.linear * B.linear) C.translation
-        = A.translation + act_affine A.linear (B.translation + act_affine B.linear C.translation)
-      rw [act_affine_mul, act_affine_add, add_assoc]
-    · exact mul_assoc A.linear B.linear C.linear
-  one := ⟨0, 1⟩
-  one_mul A := by
-    refine AffineGroup.ext ?_ ?_
-    · show 0 + act_affine 1 A.translation = A.translation
-      rw [zero_add, act_affine_one]
-    · exact one_mul A.linear
-  mul_one A := by
-    refine AffineGroup.ext ?_ ?_
-    · show A.translation + act_affine A.linear 0 = A.translation
-      rw [act_affine_zero, add_zero]
-    · exact mul_one A.linear
-  inv A := ⟨act_affine A.linear⁻¹ (-A.translation), A.linear⁻¹⟩
-  inv_mul_cancel A := by
-    refine AffineGroup.ext ?_ ?_
-    · show act_affine A.linear⁻¹ (-A.translation) + act_affine A.linear⁻¹ A.translation = 0
-      rw [act_affine_neg, neg_add_cancel]
-    · exact inv_mul_cancel A.linear
-
-/-- Inclusion of the Euclidean group into the Affine group. -/
-noncomputable def Euclidean.incl :
-    EuclideanGroup n →* AffineGroup n where
-  toFun A := ⟨A.translation, Matrix.GeneralLinearGroup.mkOfDetNeZero A.linear.val
-    (Matrix.isUnit_det_of_left_inverse A.linear.property.left).ne_zero⟩
-  map_one' := by
-    refine AffineGroup.ext ?_ ?_
-    · rfl
-    · apply Units.ext
-      show (1 : Matrix.orthogonalGroup (Fin n) ℝ).val = (1 : Matrix (Fin n) (Fin n) ℝ)
-      rw [OneMemClass.coe_one]
-  map_mul' x y := by
-    refine AffineGroup.ext ?_ ?_
-    · rfl
-    · apply Units.ext
-      show ((x.linear * y.linear).val : Matrix (Fin n) (Fin n) ℝ)
-          = (x.linear.val * y.linear.val : Matrix (Fin n) (Fin n) ℝ)
-      rw [Submonoid.coe_mul]
-
-/-- The inclusion of the Euclidean group into the affine group is injective, so it realizes
-`E(n)` as a subgroup of `Aff(n)` (issue #940, requirement 5). -/
-lemma Euclidean.incl_injective : Function.Injective (Euclidean.incl (n := n)) := by
-  intros x y hxy
-  unfold incl at hxy
-  simp at hxy
-  refine EuclideanGroup.ext ?_ ?_
-  · exact hxy.left
-  · apply Subtype.ext
-    exact congrArg Units.val hxy.right
-
-/-- The inclusion into the affine group preserves the rotation-translation decomposition; this is
-the `map_mul` transport of `ofRotationTranslation.decompose`. -/
-lemma Euclidean.incl_decompose (Q : Matrix.specialOrthogonalGroup (Fin n) ℝ)
-    (t : EuclideanSpace ℝ (Fin n)) :
-    Euclidean.incl (EuclideanGroup.ofRotationTranslation Q t) =
-      Euclidean.incl (translationVector.incl n (Multiplicative.ofAdd t)) *
-      Euclidean.incl (EuclideanGroup.ofRotation Q) := by
-  rw [ofRotationTranslation.decompose, map_mul]
