@@ -5,7 +5,7 @@ Authors: Joseph Tooby-Smith
 -/
 module
 
-public import Physlib.Relativity.Tensors.TensorSpecies.Basic
+public import Physlib.Relativity.Tensors.ComponentIdx.Single
 public import Physlib.Relativity.Tensors.Contraction.SuccSuccAbove
 public import Mathlib.Topology.Algebra.Module.ModuleTopology
 public import Mathlib.Analysis.RCLike.Basic
@@ -75,35 +75,6 @@ variable {S : TensorSpecies k C G V basisIdx rep b} {n n' n2 : ℕ} {c : Fin n �
 ## Components of tensors
 
 -/
-TODO "Refactor: Throughout the `Tensor` file system are lemmas related to
-  `ComponentIdx`. The definition of `ComponentIdx` and the lemmas about it should
-  be placed in it's own directory. Around `ComponentIdx`, we should build
-  convenient API. Here `ComponentIdx` is the type of values that indices
-  in e.g. Lorentz tensors can take."
-
-set_option linter.unusedVariables false in
-/-- Given a list of indices `c : Fin n → C` e.g. `![.up, .down]`, the type
-  `ComponentIdx c` is the type of components indexes of a tensor with those indices
-  e.g. `⟨0, 2⟩` corresponding to `T⁰₂`. -/
-@[nolint unusedArguments]
-abbrev ComponentIdx {n : ℕ} {S : TensorSpecies k C G V basisIdx rep b} (c : Fin n → C) : Type :=
-  Π j, basisIdx (c j)
-
-lemma ComponentIdx.congr_right {n : ℕ} {c : Fin n → C} (b : ComponentIdx (S := S) c)
-    (i j : Fin n) (h : i = j) : b i = basisIdxCongr (by simp [h]) (b j) := by
-  subst h
-  rfl
-
-/-- Casting of a `ComponentIdx` through equivalent color maps. -/
-def ComponentIdx.cast {n m : ℕ} {c : Fin n → C} {cm : Fin m → C}
-    (h : n = m) (hc : c = cm ∘ Fin.cast h) (b : ComponentIdx (S := S) c) :
-    ComponentIdx (S := S) cm := fun j =>
-      basisIdxCongr (by simp [hc]) (b (Fin.cast h.symm j))
-
-TODO "Define the equivalence between `ComponentIdx ![c]` and `basisIdx c`.
-  Replace Lorentz.Vector.indexEquiv and Lorentz.CoVector.indexEquiv with this more
-  general definition."
-
 /-!
 
 ## Pure tensors
@@ -582,6 +553,12 @@ lemma PermCond.auto {n m : ℕ} {c : Fin n → C} {c1 : Fin m → C}
     {σ : Fin m → Fin n} (h : PermCond c c1 σ := by {simp [PermCond]; try decide}) :
     PermCond c c1 σ := h
 
+lemma PermCond.injective {n m : ℕ} {c : Fin n → C} {c1 : Fin m → C}
+    {σ : Fin m → Fin n} (h : PermCond c c1 σ) : Function.Injective σ := h.1.1
+
+lemma PermCond.surjective {n m : ℕ} {c : Fin n → C} {c1 : Fin m → C}
+    {σ : Fin m → Fin n} (h : PermCond c c1 σ) : Function.Surjective σ := h.1.2
+
 @[simp]
 lemma PermCond.on_id {n : ℕ} {c c1 : Fin n → C} :
     PermCond c c1 (id : Fin n → Fin n) ↔ ∀ i, c i = c1 i := by
@@ -672,16 +649,99 @@ lemma PermCond.comp {n n1 n2 : ℕ} {c : Fin n → C} {c1 : Fin n1 → C}
     rw [h.2, h2.2]
 
 open Fin in
+lemma PermCond.snoc {n1} {n : ℕ} {c : Fin (n + 1) → C} {c1 : Fin n1 → C}
+    {σ : Fin n1 → Fin n} (i : Fin (n + 1)) (h : PermCond (c ∘ i.succAbove) c1 σ) :
+    PermCond c (snoc (α := fun _ ↦ C) c1 (c i))
+      (snoc (α := fun _ ↦ Fin (n+1)) (i.succAbove ∘ σ ) i) := by
+  refine ⟨⟨?_, ?_⟩, ?_⟩
+  · apply Fin.snoc_injective_of_injective
+    · exact (Fin.succAbove_right_injective (p := i)).comp h.injective
+    · simp
+  · intro k
+    rcases Fin.eq_self_or_eq_succAbove i k with (rfl | ⟨k, rfl⟩)
+    · use Fin.last n1
+      simp
+    · obtain ⟨j, rfl⟩ := h.surjective k
+      use Fin.castSucc j
+      simp
+  · intro j
+    rcases Fin.eq_castSucc_or_eq_last j with (⟨j, rfl⟩ | rfl)
+    · simp [h.preserve_color]
+    · simp
+
+lemma PermCond.succAbove_of_eq_zero {n n1 : ℕ} {c : Fin (n + 1) → C} {c1 : Fin (n1 + 1) → C}
+    {σ : Fin (n1 + 1) → Fin (n + 1)} (i : Fin (n1 + 1))
+    (h : PermCond c c1 σ) (hi : σ i = 0) :
+    PermCond (c ∘ Fin.succ) (c1 ∘ i.succAbove)
+      (fun j => (σ (i.succAbove j)).pred (by simp [← hi, h.injective.eq_iff])) := by
+  refine ⟨⟨?_, ?_⟩, ?_⟩
+  · intro x1 x2 h1
+    simpa [h.injective.eq_iff] using h1
+  · intro k
+    suffices ha : ∃ a, σ (i.succAbove a) = k.succ by
+      obtain ⟨a, ha⟩ := ha
+      use a
+      simp [ha]
+    obtain ⟨j, hj⟩ := h.surjective k.succ
+    simp only [← hj, h.injective.eq_iff, Fin.exists_succAbove_eq_iff, ne_eq]
+    grind
+  · intro x
+    simp [h.preserve_color]
+
+lemma PermCond.succAbove_of_neq_zero {n n1 : ℕ} {c : Fin (n + 1) → C} {c1 : Fin (n1 + 1) → C}
+    {σ : Fin (n1 + 1) → Fin (n + 1)} (i : Fin (n1 + 1))
+    (h : PermCond c c1 σ) (hi : σ i ≠ 0) :
+    PermCond (c ∘ (σ i).succAbove) (c1 ∘ i.succAbove)
+      ((Fin.pred (σ i) hi).predAbove  ∘ σ ∘ i.succAbove) := by
+  have hpr : σ i = ((σ i).pred hi).succ := (Fin.succ_pred _ _).symm
+  have hne : ∀ x, σ (i.succAbove x) ≠ σ i := fun x heq =>
+    Fin.succAbove_ne i x (h.injective heq)
+  refine ⟨⟨?_, ?_⟩, ?_⟩
+  · intro x1 x2 h2
+    simp only [Function.comp_apply] at h2
+    apply i.succAbove_right_injective (h.injective ?_)
+    suffices h' :
+        ((σ i).pred hi).succ.succAbove (((σ i).pred hi).predAbove (σ (i.succAbove x1))) =
+        ((σ i).pred hi).succ.succAbove (((σ i).pred hi).predAbove (σ (i.succAbove x2))) by
+      rwa [Fin.succ_succAbove_predAbove (hpr ▸ hne x1),
+        Fin.succ_succAbove_predAbove (hpr ▸ hne x2)] at h'
+    simpa using h2
+  · intro k
+    simp only [Function.comp_apply]
+    suffices h' : ∃ a, σ (i.succAbove a) = (σ i).succAbove k by
+      conv => enter [1, a]; rw [← ((σ i).pred hi).succ.succAbove_right_injective.eq_iff]
+      obtain ⟨a, h'⟩ := h'
+      exact ⟨a, by rw [Fin.succ_succAbove_predAbove (hpr ▸ hne a), ← hpr]; exact h'⟩
+    obtain ⟨j, hj⟩ := h.surjective ((σ i).succAbove k)
+    simp only [← hj, h.injective.eq_iff, Fin.exists_succAbove_eq_iff, ne_eq]
+    rintro rfl
+    simp at hj
+  · intro x
+    simp only [h.preserve_color, Function.comp_apply]
+    congr 1
+    conv_lhs => enter[1]; rw [hpr]
+    exact Fin.succ_succAbove_predAbove (hpr ▸ hne x)
+
+lemma PermCond.succAbove {n n1 : ℕ} {c : Fin (n + 1) → C} {c1 : Fin (n1 + 1) → C}
+    {σ : Fin (n1 + 1) → Fin (n + 1)} (i : Fin (n1 + 1))
+    (h : PermCond c c1 σ) :
+    PermCond (c ∘ (σ i).succAbove) (c1 ∘ i.succAbove)
+      (if hi : σ i = 0 then fun j => (σ (i.succAbove j)).pred (by simp [← hi, h.injective.eq_iff])
+      else (Fin.pred (σ i) hi).predAbove  ∘ σ ∘ i.succAbove) := by
+  by_cases hi : σ i = 0
+  · simpa [hi] using PermCond.succAbove_of_eq_zero i h hi
+  · simpa [hi] using PermCond.succAbove_of_neq_zero i h hi
+
 lemma PermCond.succSuccAbove {n n1 : ℕ} {c : Fin (n + 1 + 1) → C}
     {c1 : Fin (n1 + 1 + 1) → C}
     (i j : Fin (n1 + 1 + 1)) (hij : i ≠ j)
     {σ : Fin (n1 + 1 + 1) → Fin (n + 1 + 1)} (hσ : PermCond c c1 σ) :
-    PermCond (c ∘ succSuccAbove (σ i) (σ j))
-      (c1 ∘ succSuccAbove i j) (funPredPredAbove i j hij σ hσ.1) := by
+    PermCond (c ∘  (σ i).succSuccAbove (σ j))
+      (c1 ∘ i.succSuccAbove j) (i.funPredPredAbove j hij σ hσ.1) := by
   apply And.intro
-  · exact funPredPredAbove_bijective i j hij σ hσ.left
+  · exact Fin.funPredPredAbove_bijective i j hij σ hσ.left
   · intro m
-    simp [funPredPredAbove, hσ.2]
+    simp [Fin.funPredPredAbove, hσ.2]
 
 open Fin in
 lemma PermCond.succSuccAbove_comm {n : ℕ} {c : Fin (n + 1 + 1 + 1 + 1) → C}

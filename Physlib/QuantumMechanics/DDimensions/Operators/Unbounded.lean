@@ -58,13 +58,16 @@ these correspond to physical observables.
   - A.5. Inequalities
 - B. Operators on inner product/Hilbert spaces
   - B.1. Definitions
-  - B.2. Dense domain
-  - B.3. Closability
-  - B.4. Adjoints
-  - B.5. Symmetric operators
-  - B.6. Self-adjoint operators
-  - B.7. Essentially self-adjoint operators
-  - B.8. Unbounded operators
+  - B.2. Basic properties
+    - B.2.1. Dense domain
+    - B.2.2. Closability
+    - B.2.3. Adjoints
+    - B.2.4. Continuity / boundedness
+  - B.3. Classes of operators
+    - B.3.1. Symmetric operators
+    - B.3.2. Self-adjoint operators
+    - B.3.3. Essentially self-adjoint operators
+    - B.3.4. Unbounded operators
 
 ## iv. References
 
@@ -357,12 +360,6 @@ def HasDenseDomain (U : H →ₗ.[ℂ] H') : Prop := Dense (U.domain : Set H)
 
 lemma hasDenseDomain_def : U.HasDenseDomain ↔ Dense (U.domain : Set H) := Iff.rfl
 
-/-- A LinearPMap is bounded iff there exists a constant `c` such that `‖U x‖ ≤ c * ‖x‖`
-  for all `x : U.domain`. -/
-def IsBounded (U : H →ₗ.[ℂ] H') : Prop := ∃ c > 0, ∀ x : U.domain, ‖U x‖ ≤ c * ‖x‖
-
-lemma isBounded_def : U.IsBounded ↔ ∃ c > 0, ∀ x : U.domain, ‖U x‖ ≤ c * ‖x‖ := Iff.rfl
-
 /-- A LinearPMap is an unbounded operator iff it has dense domain and is closable. -/
 def IsUnbounded (U : H →ₗ.[ℂ] H') : Prop := U.HasDenseDomain ∧ U.IsClosable
 
@@ -380,7 +377,11 @@ lemma isEssentiallySelfAdjoint_def [CompleteSpace H] :
     T.IsEssentiallySelfAdjoint ↔ IsSelfAdjoint T.closure := Iff.rfl
 
 /-!
-### B.2. Dense domain
+### B.2. Basic properties
+-/
+
+/-!
+#### B.2.1. Dense domain
 -/
 
 lemma HasDenseDomain.isUnbounded_iff_isClosable (h : U.HasDenseDomain) :
@@ -436,7 +437,7 @@ lemma pow_hasDenseDomain_of_le
   h.mono <| pow_sub_mul_pow T hle ▸ compRestricted_domain_le _ _
 
 /-!
-### B.3. Closability
+#### B.2.2. Closability
 -/
 
 lemma IsClosable.isClosed_iff (h : U.IsClosable) : U.IsClosed ↔ U.closure = U := by
@@ -517,7 +518,7 @@ lemma closure_smul (U : H →ₗ.[ℂ] H') {c : ℂ} (hc : c ≠ 0) : (c • U).
   · rw [closure_def' h, closure_def' <| (not_congr <| IsClosable.smul_iff hc).mpr h]
 
 /-!
-### B.4. Adjoints
+#### B.2.3. Adjoints
 -/
 
 @[simp]
@@ -614,7 +615,168 @@ lemma adjoint_pow_le_pow_adjoint [CompleteSpace H] {n : ℕ} (h : (T ^ n).HasDen
     exact pow_succ' T† n ▸ compRestricted_mono_right T† (ih hTn)
 
 /-!
-### B.5. Symmetric operators
+#### B.2.4. Continuity / boundedness
+-/
+
+/-- `f : E →ₗ[𝕜] F` is continuous iff there exists `M > 0` s.t. `‖f x‖ ≤ M * ‖x‖` for all `x : E`.
+
+  This is a (convenient) immediate consequence of
+  `IsBoundedLinearMap.isLinearMap_and_continuous_iff_isBoundedLinearMap`. -/
+lemma _root_.LinearMap.continuous_iff_bounded {𝕜 E F : Type*} [NontriviallyNormedField 𝕜]
+    [SeminormedAddCommGroup E] [NormedSpace 𝕜 E] [SeminormedAddCommGroup F] [NormedSpace 𝕜 F]
+    {f : E →ₗ[𝕜] F} : Continuous f ↔ ∃ M, 0 < M ∧ ∀ x : E, ‖f x‖ ≤ M * ‖x‖ := by
+  refine (and_congr_right_iff (a := IsLinearMap 𝕜 f)).mp ?_ f.isLinear
+  rw [← isBoundedLinearMap_iff]
+  exact IsBoundedLinearMap.isLinearMap_and_continuous_iff_isBoundedLinearMap f
+
+/-- Continuous operators are closable. -/
+lemma isClosable_of_continuous (h : Continuous U) : U.IsClosable := by
+  use U.graph.topologicalClosure.toLinearPMap
+  refine (toLinearPMap_graph_eq _ fun x hx hx₁ ↦ ?_).symm
+  obtain ⟨b, hb, hbx⟩ := mem_closure_iff_seq_limit.mp hx
+  rw [nhds_prod_eq] at hbx
+  apply norm_eq_zero.mp
+  apply tendsto_nhds_unique hbx.snd.norm
+  obtain ⟨M, hM, h_bound⟩ := LinearMap.continuous_iff_bounded.mp h
+  refine squeeze_zero (g := fun n ↦ M * ‖(b n).1‖) (fun _ ↦ norm_nonneg _) (fun n ↦ ?_) ?_
+  · obtain ⟨y, hy₁, hy₂⟩ := (mem_graph_iff _).mp (hb n)
+    simp only [← hy₁, ← hy₂]
+    exact h_bound y
+  · exact mul_zero M ▸ (norm_eq_zero.mpr hx₁) ▸ hbx.fst.norm.const_mul M
+
+/-- A strengthening of `closure_domain_le_domain_closure` for continuous operators. -/
+lemma closure_domain_eq_domain_closure_of_continuous [CompleteSpace H'] (h : Continuous U) :
+    U.closure.domain = U.domain.closure := by
+  refine eq_of_le_of_ge U.closure_domain_le_domain_closure fun x hx ↦ ?_
+  obtain ⟨M, hM, h_bound⟩ := LinearMap.continuous_iff_bounded.mp h
+  obtain ⟨b, hb, hb'⟩ := mem_closure_iff_seq_limit.mp hx
+  simp only [coe_toAddSubmonoid, SetLike.mem_coe] at hb
+  let Ub : ℕ → H' := fun n ↦ U ⟨b n, hb n⟩
+  have hCS : CauchySeq Ub := by
+    refine Metric.cauchySeq_iff'.mpr fun ε hε ↦ ?_
+    obtain ⟨N, hN⟩ := Metric.cauchySeq_iff'.mp hb'.cauchySeq (M⁻¹ * ε) (by positivity)
+    refine ⟨N, fun n hn ↦ ?_⟩
+    refine lt_of_le_of_lt ?_ ((lt_inv_mul_iff₀ hM).mp (hN n hn))
+    calc
+      _ = ‖Ub n - Ub N‖ := dist_eq_norm _ _
+      _ = ‖U (⟨b n, hb n⟩ - ⟨b N, hb N⟩)‖ := by simp [Ub, map_sub]
+      _ ≤ M * ‖b n - b N‖ := h_bound _
+      _ = M * dist (b n) (b N) := by rw [dist_eq_norm]
+  obtain ⟨y, hy⟩ := CompleteSpace.complete hCS
+  apply mem_domain_iff.mpr
+  rw [← (isClosable_of_continuous h).graph_closure_eq_closure_graph]
+  use y
+  apply mem_closure_iff_seq_limit.mpr
+  refine ⟨fun n ↦ (b n, Ub n), fun n ↦ ?_, ?_⟩
+  · simp [hb n, Ub]
+  · rw [nhds_prod_eq]
+    exact Filter.Tendsto.prodMk hb' hy
+
+/-- A continuous operator is closed iff its domain is closed. -/
+lemma isClosed_iff_isClosed_domain_of_continuous [CompleteSpace H'] (h : Continuous U) :
+    U.IsClosed ↔ _root_.IsClosed (U.domain : Set H) := by
+  rw [(isClosable_of_continuous h).isClosed_iff]
+  have h_domain := closure_domain_eq_domain_closure_of_continuous h
+  constructor <;> intro hcl
+  · exact hcl ▸ h_domain ▸ isClosed_closure
+  · refine (eq_of_le_of_domain_eq U.le_closure ?_).symm
+    exact h_domain ▸ hcl.submodule_topologicalClosure_eq.symm
+
+lemma IsClosed.isClosed_toFun_graph (hU : U.IsClosed) :
+    _root_.IsClosed (U.toFun.graph : Set (U.domain × H')) := by
+  refine isClosed_of_closure_subset fun ⟨x₁, x₂⟩ hx ↦ ?_
+  simp only [SetLike.mem_coe, LinearMap.mem_graph_iff, toFun_eq_coe]
+  suffices (↑x₁, x₂) ∈ U.graph.topologicalClosure by
+    simp_all [hU.isClosable.graph_closure_eq_closure_graph, hU.isClosable.isClosed_iff.mp hU]
+  obtain ⟨b, hb, hbx⟩ := mem_closure_iff_seq_limit.mp hx
+  apply mem_closure_iff_seq_limit.mpr
+  rw [nhds_prod_eq] at *
+  refine ⟨fun n ↦ (↑(b n).1, (b n).2), by simp_all, ?_⟩
+  exact Filter.Tendsto.prodMk (tendsto_subtype_rng.mp hbx.fst) hbx.snd
+
+/-- The **closed graph theorem** for partial linear maps:
+  a closed operator with closed domain is continuous.
+
+  This follows immediately from `LinearMap.continuous_of_isClosed_graph`
+  and the completeness of `H` and `H'`. -/
+lemma IsClosed.continuous_of_isClosed_domain [CompleteSpace H] [CompleteSpace H']
+    (hU : U.IsClosed) (h : _root_.IsClosed (U.domain : Set H)) :
+    Continuous U := by
+  have hCS : CompleteSpace U.domain := instCompleteSpaceSubtypeMemSubmoduleOfIsClosedCoe U.domain
+  refine @LinearMap.continuous_of_isClosed_graph _ _ _ _ _ hCS _ _ _ _ U.toFun ?_
+  exact hU.isClosed_toFun_graph
+
+/-- Closability is preserved upon adding a continuous operator. -/
+lemma IsClosable.add_continuous
+    (h₁ : U₁.IsClosable) (h₂ : Continuous U₂) (h : U₁.domain ≤ U₂.domain) :
+    (U₁ + U₂).IsClosable := by
+  use (U₁ + U₂).graph.topologicalClosure.toLinearPMap
+  refine (toLinearPMap_graph_eq _ fun ⟨x₁, x₂⟩ hx hx₁ ↦ ?_).symm
+  subst hx₁
+  refine graph_fst_eq_zero_snd U₁.closure ?_ rfl
+  rw [← h₁.graph_closure_eq_closure_graph]
+  apply mem_closure_iff_seq_limit.mpr
+  obtain ⟨b, hb, hbx⟩ := mem_closure_iff_seq_limit.mp hx
+  simp only [coe_toAddSubmonoid, SetLike.mem_coe, mem_graph_iff, add_domain, add_apply,
+    Subtype.exists, exists_and_left, exists_eq_left, nhds_prod_eq] at *
+  refine ⟨fun n ↦ ((b n).1, (b n).2 - U₂ ⟨(b n).1, h (hb n).choose.1⟩), fun n ↦ ?_, ?_⟩
+  · exact ⟨(hb n).choose.1, eq_sub_of_add_eq (hb n).choose_spec⟩
+  · refine Filter.Tendsto.prodMk hbx.fst ?_
+    refine sub_zero x₂ ▸ hbx.snd.sub ?_
+    exact map_zero U₂ ▸ (h₂.tendsto 0).comp (tendsto_subtype_rng.mpr hbx.fst)
+
+/-- Closability is preserved upon subtracting a continuous operator. -/
+lemma IsClosable.sub_continuous
+    (h₁ : U₁.IsClosable) (h₂ : Continuous U₂) (h : U₁.domain ≤ U₂.domain) : (U₁ - U₂).IsClosable :=
+  sub_eq_add_neg U₁ U₂ ▸ h₁.add_continuous h₂.neg h
+
+/-- Closedness is preserved upon adding a continuous operator. -/
+lemma IsClosed.add_continuous [CompleteSpace H']
+    (h₁ : U₁.IsClosed) (h₂ : Continuous U₂) (h : U₁.domain ≤ U₂.domain) : (U₁ + U₂).IsClosed := by
+  have hcl : (U₁ + U₂).IsClosable := h₁.isClosable.add_continuous h₂ h
+  apply hcl.isClosed_iff.mpr
+  refine eq_of_le_of_ge (le_of_le_graph ?_) (U₁ + U₂).le_closure
+  rw [← hcl.graph_closure_eq_closure_graph]
+  intro ⟨x₁, x₂⟩ hx
+  obtain ⟨b, hb, hbx⟩ := mem_closure_iff_seq_limit.mp hx
+  simp only [coe_toAddSubmonoid, SetLike.mem_coe, mem_graph_iff, Subtype.exists, exists_and_left,
+    exists_eq_left, add_domain, inf_of_le_left h] at hb
+  rw [nhds_prod_eq] at hbx
+  have hb₁U₂ : ∀ n, (b n).1 ∈ U₂.domain := fun n ↦ h (hb n).choose
+  have hCS : CauchySeq fun n ↦ U₂ ⟨(b n).1, hb₁U₂ n⟩ := by
+    obtain ⟨M, hM, h_bound⟩ := LinearMap.continuous_iff_bounded.mp h₂
+    refine Metric.cauchySeq_iff'.mpr fun ε hε ↦ ?_
+    obtain ⟨N, hN⟩ := Metric.cauchySeq_iff'.mp hbx.fst.cauchySeq (M⁻¹ * ε) (by positivity)
+    refine ⟨N, fun n hn ↦ ?_⟩
+    calc
+      _ = ‖U₂ (⟨(b n).1, hb₁U₂ n⟩ - ⟨(b N).1, hb₁U₂ N⟩)‖ := by rw [map_sub, dist_eq_norm]
+      _ ≤ M * ‖(b n).1 - (b N).1‖ := h_bound _
+      _ < ε := dist_eq_norm (b n).1 (b N).1 ▸ (lt_inv_mul_iff₀ hM).mp (hN n hn)
+  obtain ⟨y, hy⟩ := CompleteSpace.complete hCS
+  have hU₁ : (x₁, x₂ - y) ∈ U₁.graph := by
+    rw [← h₁.isClosable.isClosed_iff.mp h₁, ← h₁.isClosable.graph_closure_eq_closure_graph]
+    apply mem_closure_iff_seq_limit.mpr
+    refine ⟨fun n ↦ ((b n).1, (b n).2 - U₂ ⟨(b n).1, hb₁U₂ n⟩), fun n ↦ ?_, ?_⟩
+    · simp_all [add_apply, eq_sub_iff_add_eq]
+    · rw [nhds_prod_eq]
+      exact hbx.fst.prodMk (hbx.snd.sub hy)
+  have hx₁ : x₁ ∈ U₁.domain := mem_domain_of_mem_graph hU₁
+  have hU₂y : U₂ ⟨x₁, h hx₁⟩ = y := by
+    refine tendsto_nhds_unique ((h₂.tendsto ⟨x₁, h hx₁⟩).comp ?_) (Filter.tendsto_map'_iff.mp hy)
+    exact tendsto_subtype_rng.mpr hbx.fst
+  simp_all [add_domain, add_apply]
+
+/-- Closedness is preserved upon subtracting a continuous operator. -/
+lemma IsClosed.sub_continuous [CompleteSpace H']
+    (h₁ : U₁.IsClosed) (h₂ : Continuous U₂) (h : U₁.domain ≤ U₂.domain) : (U₁ - U₂).IsClosed :=
+  sub_eq_add_neg U₁ U₂ ▸ h₁.add_continuous h₂.neg h
+
+/-!
+### B.3. Classes of operators
+-/
+
+/-!
+#### B.3.1. Symmetric operators
 -/
 
 /-- The analogue of `inner_map_polarization` for LinearPMap. -/
@@ -728,7 +890,7 @@ lemma IsSymmetric.of_le (h₁ : T₁.IsSymmetric) (h_le : T₂ ≤ T₁) : T₂.
   exact hx ▸ hy ▸ h₁ ⟨x, h_le.1 x.2⟩ ⟨y, h_le.1 y.2⟩
 
 /-!
-### B.6. Self-adjoint operators
+#### B.3.2. Self-adjoint operators
 -/
 
 lemma IsSelfAdjoint.isSymmetric [CompleteSpace H] (h : IsSelfAdjoint T) : T.IsSymmetric := by
@@ -771,7 +933,7 @@ lemma IsSelfAdjoint.neg [CompleteSpace H] (h : IsSelfAdjoint T) : IsSelfAdjoint 
   neg_eq_neg_one_smul T ▸ smul h (by norm_num) (by norm_num)
 
 /-!
-### B.7. Essentially self-adjoint operators
+#### B.3.3. Essentially self-adjoint operators
 -/
 
 lemma IsEssentiallySelfAdjoint.hasDenseDomain [CompleteSpace H] (h : T.IsEssentiallySelfAdjoint) :
@@ -818,7 +980,7 @@ lemma IsEssentiallySelfAdjoint.neg [CompleteSpace H] (h : T.IsEssentiallySelfAdj
   neg_eq_neg_one_smul T ▸ h.smul (by norm_num) (by norm_num)
 
 /-!
-### B.8. Unbounded operators
+#### B.3.4. Unbounded operators
 -/
 
 lemma IsUnbounded.hasDenseDomain (h : U.IsUnbounded) : U.HasDenseDomain := h.1
