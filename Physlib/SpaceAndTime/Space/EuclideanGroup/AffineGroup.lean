@@ -24,7 +24,7 @@ self-contained and is not used by the inclusion.
 
 The inclusion:
 
-* `OrthogonalToLinearIsometryEquiv` : an orthogonal matrix as a linear isometry equivalence of
+* `orthogonalToLinearIsometryEquiv` : an orthogonal matrix as a linear isometry equivalence of
   `EuclideanSpace ℝ (Fin n)`.
 * `Euclidean.toAffineIsometryHom` : `⟨t, Q⟩ ↦ (x ↦ Q x + t)`, as a monoid homomorphism into the
   affine isometry group (first leg).
@@ -35,7 +35,7 @@ The inclusion:
 
 The optional strengthening (section `EuclideanIsometryEquiv`, not used by the inclusion):
 
-* `LinearIsometryEquivToOrthogonal` : the inverse bridge, a linear isometry equivalence read back as
+* `linearIsometryEquivToOrthogonal` : the inverse bridge, a linear isometry equivalence read back as
   an orthogonal matrix.
 * `Euclidean.toAffineIsometryEquiv` : `Euclidean.toAffineIsometryHom` upgraded to a group
   isomorphism `EuclideanGroup n ≃* AffineIsometryEquiv ℝ (EuclideanSpace ℝ (Fin n)) _`.
@@ -47,7 +47,7 @@ variable {n : ℕ}
 
 open scoped Matrix in
 /-- An orthogonal matrix viewed as a linear isometry equivalence of `EuclideanSpace ℝ (Fin n)`. -/
-noncomputable def OrthogonalToLinearIsometryEquiv
+noncomputable def orthogonalToLinearIsometryEquiv
     (Q : Matrix.orthogonalGroup (Fin n) ℝ) :
     EuclideanSpace ℝ (Fin n) ≃ₗᵢ[ℝ] EuclideanSpace ℝ (Fin n) :=
   (DistribMulAction.toLinearEquiv ℝ (EuclideanSpace ℝ (Fin n)) Q).isometryOfInner fun x y => by
@@ -57,9 +57,9 @@ noncomputable def OrthogonalToLinearIsometryEquiv
     have hQ : (Q.val)ᵀ * Q.val = 1 := (Matrix.mem_orthogonalGroup_iff' (Fin n) ℝ).mp Q.property
     rw [Matrix.dotProduct_mulVec, Matrix.vecMul_mulVec, hQ, Matrix.vecMul_one]
 
-@[simp] lemma OrthogonalToLinearIsometryEquiv_apply
+@[simp] lemma orthogonalToLinearIsometryEquiv_apply
     (Q : Matrix.orthogonalGroup (Fin n) ℝ) (x : EuclideanSpace ℝ (Fin n)) :
-    OrthogonalToLinearIsometryEquiv Q x = Q • x := rfl
+    orthogonalToLinearIsometryEquiv Q x = Q • x := rfl
 
 /-! ### `One`/`Mul` projection lemmas for `EuclideanGroup`
 
@@ -79,7 +79,7 @@ noncomputable def Euclidean.toAffineIsometryHom :
     EuclideanGroup n →*
       AffineIsometryEquiv ℝ (EuclideanSpace ℝ (Fin n)) (EuclideanSpace ℝ (Fin n)) where
   toFun A := AffineIsometryEquiv.constVAdd ℝ (EuclideanSpace ℝ (Fin n)) A.translation *
-    (OrthogonalToLinearIsometryEquiv A.linear).toAffineIsometryEquiv
+    (orthogonalToLinearIsometryEquiv A.linear).toAffineIsometryEquiv
   map_one' := by
     apply AffineIsometryEquiv.ext
     intro x; simp
@@ -92,7 +92,7 @@ noncomputable def Euclidean.toAffineIsometryHom :
 @[simp] lemma Euclidean.toAffineIsometryHom_apply (A : EuclideanGroup n) :
     Euclidean.toAffineIsometryHom A =
       AffineIsometryEquiv.constVAdd ℝ (EuclideanSpace ℝ (Fin n)) A.translation *
-        (OrthogonalToLinearIsometryEquiv A.linear).toAffineIsometryEquiv := rfl
+        (orthogonalToLinearIsometryEquiv A.linear).toAffineIsometryEquiv := rfl
 
 /-- `AffineIsometryEquiv.toAffineEquiv` bundled as a monoid homomorphism into the affine
 automorphism group. -/
@@ -120,8 +120,8 @@ the two round-trip identities. Nothing above this section depends on it. -/
 section EuclideanIsometryEquiv
 
 /-- A linear isometry equivalence read back as an orthogonal matrix, inverse to
-`OrthogonalToLinearIsometryEquiv` (see the round-trip `@[simp]` lemmas below). -/
-noncomputable def LinearIsometryEquivToOrthogonal
+`orthogonalToLinearIsometryEquiv` (see the round-trip `@[simp]` lemmas below). -/
+noncomputable def linearIsometryEquivToOrthogonal
     (L : EuclideanSpace ℝ (Fin n) ≃ₗᵢ[ℝ] EuclideanSpace ℝ (Fin n)) :
     Matrix.orthogonalGroup (Fin n) ℝ :=
    let b := EuclideanSpace.basisFun (Fin n) ℝ
@@ -134,13 +134,13 @@ noncomputable def LinearIsometryEquivToOrthogonal
     rw [hb]
     exact b.toMatrix_orthonormalBasis_mem_orthogonal (b.map L)⟩
 
-/-- `LinearIsometryEquivToOrthogonal` is a right inverse of `OrthogonalToLinearIsometryEquiv`. -/
-@[simp] lemma OrthogonalToLinearIsometryEquiv_right_inv
+/-- `linearIsometryEquivToOrthogonal` is a right inverse of `orthogonalToLinearIsometryEquiv`. -/
+@[simp] lemma orthogonalToLinearIsometryEquiv_right_inv
     (L : EuclideanSpace ℝ (Fin n) ≃ₗᵢ[ℝ] EuclideanSpace ℝ (Fin n)) :
-    OrthogonalToLinearIsometryEquiv (LinearIsometryEquivToOrthogonal L) = L := by
+    orthogonalToLinearIsometryEquiv (linearIsometryEquivToOrthogonal L) = L := by
     apply LinearIsometryEquiv.ext; intro x
-    rw [OrthogonalToLinearIsometryEquiv_apply]
-    show Matrix.toEuclideanLin (LinearIsometryEquivToOrthogonal L).val x = L x
+    rw [orthogonalToLinearIsometryEquiv_apply]
+    show Matrix.toEuclideanLin (linearIsometryEquivToOrthogonal L).val x = L x
     rw [Matrix.toEuclideanLin_eq_toLin_orthonormal]
     show Matrix.toLin _ _
         (LinearMap.toMatrix _ _
@@ -148,19 +148,19 @@ noncomputable def LinearIsometryEquivToOrthogonal
     rw [Matrix.toLin_toMatrix]
     rfl
 
-/-- `LinearIsometryEquivToOrthogonal` is a left inverse of `OrthogonalToLinearIsometryEquiv`. -/
-@[simp] lemma OrthogonalToLinearIsometryEquiv_left_inv
+/-- `linearIsometryEquivToOrthogonal` is a left inverse of `orthogonalToLinearIsometryEquiv`. -/
+@[simp] lemma orthogonalToLinearIsometryEquiv_left_inv
     (Q : Matrix.orthogonalGroup (Fin n) ℝ) :
-    LinearIsometryEquivToOrthogonal (OrthogonalToLinearIsometryEquiv Q) = Q := by
+    linearIsometryEquivToOrthogonal (orthogonalToLinearIsometryEquiv Q) = Q := by
   apply Subtype.ext
   have hlin :
-      ((OrthogonalToLinearIsometryEquiv Q).toLinearEquiv :
+      ((orthogonalToLinearIsometryEquiv Q).toLinearEquiv :
           EuclideanSpace ℝ (Fin n) →ₗ[ℝ] EuclideanSpace ℝ (Fin n))
         = Matrix.toLin (EuclideanSpace.basisFun (Fin n) ℝ).toBasis
             (EuclideanSpace.basisFun (Fin n) ℝ).toBasis Q.val := by
     ext x; rfl
   show LinearMap.toMatrix _ _
-      ((OrthogonalToLinearIsometryEquiv Q).toLinearEquiv :
+      ((orthogonalToLinearIsometryEquiv Q).toLinearEquiv :
         EuclideanSpace ℝ (Fin n) →ₗ[ℝ] EuclideanSpace ℝ (Fin n)) = Q.val
   rw [hlin, LinearMap.toMatrix_toLin]
 
@@ -183,15 +183,15 @@ noncomputable def Euclidean.toAffineIsometryEquiv :
     EuclideanGroup n ≃*
       AffineIsometryEquiv ℝ (EuclideanSpace ℝ (Fin n)) (EuclideanSpace ℝ (Fin n)) where
   toFun := Euclidean.toAffineIsometryHom
-  invFun e := ⟨e 0, LinearIsometryEquivToOrthogonal e.linearIsometryEquiv⟩
+  invFun e := ⟨e 0, linearIsometryEquivToOrthogonal e.linearIsometryEquiv⟩
   left_inv A := by
     refine EuclideanGroup.ext ?_ ?_
     · simp
-    · simp [linearIsometryEquiv_constVAdd_mul, OrthogonalToLinearIsometryEquiv_left_inv]
+    · simp [linearIsometryEquiv_constVAdd_mul, orthogonalToLinearIsometryEquiv_left_inv]
   right_inv e := by
     apply AffineIsometryEquiv.ext; intro x
     simp only [Euclidean.toAffineIsometryHom_apply,
-      OrthogonalToLinearIsometryEquiv_right_inv,
+      orthogonalToLinearIsometryEquiv_right_inv,
       AffineIsometryEquiv.coe_mul, Function.comp_apply,
       LinearIsometryEquiv.coe_toAffineIsometryEquiv,
       AffineIsometryEquiv.coe_constVAdd, vadd_eq_add]
