@@ -8,200 +8,200 @@ module
 public import Physlib.SpaceAndTime.Space.EuclideanGroup.Basic
 
 /-!
-# The affine group and the inclusion of the Euclidean group
+# The inclusion of the Euclidean group into the affine isometry group
 
-This file defines the `n`-dimensional affine group `AffineGroup n` as the semidirect product of
-translations of `EuclideanSpace ℝ (Fin n)` with the general linear group `GL(n, ℝ)`, equips it with
-a group structure, and constructs the inclusion of the Euclidean group `EuclideanGroup n` into it.
+We include the abstract Euclidean group `EuclideanGroup n = ℝⁿ ⋊ O(n)` into Mathlib's affine
+automorphism group, as the composite of two monoid homomorphisms
 
-It then connects this concrete affine group to Mathlib's affine automorphism group
-`AffineEquiv ℝ (EuclideanSpace ℝ (Fin n)) _`: the group isomorphism `AffineGroup.toAffineEquiv`
-identifies the two, and composing it with `Euclidean.incl` realizes the Euclidean group inside
-Mathlib's affine group as `Euclidean.toAffineEquiv`.
+`EuclideanGroup n →* AffineIsometryEquiv ℝ (EuclideanSpace ℝ (Fin n)) _ →* AffineEquiv ℝ _ _`.
+
+This composite, `Euclidean.toAffineEquiv`, is the result intended for use elsewhere. The final
+section additionally upgrades the first homomorphism to a group isomorphism, exhibiting
+`EuclideanGroup n` as the full group of affine isometries of Euclidean space; that strengthening is
+self-contained and is not used by the inclusion.
 
 ## Main definitions
 
-* `AffineGroup n` : the affine group `ℝⁿ ⋊ GL(n, ℝ)`.
-* `Euclidean.incl` : the inclusion `EuclideanGroup n →* AffineGroup n`.
-* `AffineGroup.toAffineEquiv` : the group isomorphism between `AffineGroup n` and Mathlib's
-  `AffineEquiv ℝ (EuclideanSpace ℝ (Fin n)) _`.
-* `Euclidean.toAffineEquiv` : the inclusion of the Euclidean group into Mathlib's affine group.
+The inclusion:
 
-The isomorphism `AffineGroup.toAffineEquiv` uses `GLToLinEquiv` and `LinEquivToGL` to move
-between matrix linear parts and linear automorphisms of Euclidean space.
+* `OrthogonalToLinearIsometryEquiv` : an orthogonal matrix as a linear isometry equivalence of
+  `EuclideanSpace ℝ (Fin n)`.
+* `Euclidean.toAffineIsometryHom` : `⟨t, Q⟩ ↦ (x ↦ Q x + t)`, as a monoid homomorphism into the
+  affine isometry group (first leg).
+* `AffineIsometryEquiv.toAffineEquivHom` : `AffineIsometryEquiv.toAffineEquiv` as a monoid
+  homomorphism (second leg).
+* `Euclidean.toAffineEquiv` : the inclusion into the affine automorphism group, the composite of
+  the two legs.
+
+The optional strengthening (section `EuclideanIsometryEquiv`, not used by the inclusion):
+
+* `LinearIsometryEquivToOrthogonal` : the inverse bridge, a linear isometry equivalence read back as
+  an orthogonal matrix.
+* `Euclidean.toAffineIsometryEquiv` : `Euclidean.toAffineIsometryHom` upgraded to a group
+  isomorphism `EuclideanGroup n ≃* AffineIsometryEquiv ℝ (EuclideanSpace ℝ (Fin n)) _`.
 -/
 
 @[expose] public section
 
 variable {n : ℕ}
 
-/-- The group of invertible affine transformations of `EuclideanSpace ℝ (Fin n)`. -/
-@[ext]
-structure AffineGroup (n : ℕ) where
-  /-- The translation part of an affine transformation. -/
-  translation : EuclideanSpace ℝ (Fin n)
-  /-- The linear part of an affine transformation, as an invertible matrix. -/
-  linear : Matrix.GeneralLinearGroup (Fin n) ℝ
+open scoped Matrix in
+/-- An orthogonal matrix viewed as a linear isometry equivalence of `EuclideanSpace ℝ (Fin n)`. -/
+noncomputable def OrthogonalToLinearIsometryEquiv
+    (Q : Matrix.orthogonalGroup (Fin n) ℝ) :
+    EuclideanSpace ℝ (Fin n) ≃ₗᵢ[ℝ] EuclideanSpace ℝ (Fin n) :=
+  (DistribMulAction.toLinearEquiv ℝ (EuclideanSpace ℝ (Fin n)) Q).isometryOfInner fun x y => by
+    simp only [DistribMulAction.toLinearEquiv_apply,
+      EuclideanSpace.inner_eq_star_dotProduct, star_trivial]
+    show (Q.val *ᵥ y.ofLp) ⬝ᵥ (Q.val *ᵥ x.ofLp) = y.ofLp ⬝ᵥ x.ofLp
+    have hQ : (Q.val)ᵀ * Q.val = 1 := (Matrix.mem_orthogonalGroup_iff' (Fin n) ℝ).mp Q.property
+    rw [Matrix.dotProduct_mulVec, Matrix.vecMul_mulVec, hQ, Matrix.vecMul_one]
 
-/-- Group structure on `Aff(n) = ℝ^n ⋊ GL(n)`, with the usual semidirect-product
-multiplication. -/
-noncomputable instance : Group (AffineGroup n) where
-  mul A B := ⟨A.translation + A.linear • B.translation, A.linear * B.linear⟩
-  mul_assoc A B C := by
-    refine AffineGroup.ext ?_ ?_
-    · show A.translation + A.linear • B.translation + (A.linear * B.linear) • C.translation
-        = A.translation + A.linear • (B.translation + B.linear • C.translation)
-      rw [mul_smul, smul_add, add_assoc]
-    · exact mul_assoc A.linear B.linear C.linear
-  one := ⟨0, 1⟩
-  one_mul A := by
-    refine AffineGroup.ext ?_ ?_
-    · show 0 + (1 : Matrix.GeneralLinearGroup (Fin n) ℝ) • A.translation = A.translation
-      rw [zero_add, one_smul]
-    · exact one_mul A.linear
-  mul_one A := by
-    refine AffineGroup.ext ?_ ?_
-    · show A.translation + A.linear • 0 = A.translation
-      rw [smul_zero, add_zero]
-    · exact mul_one A.linear
-  inv A := ⟨A.linear⁻¹ • (-A.translation), A.linear⁻¹⟩
-  inv_mul_cancel A := by
-    refine AffineGroup.ext ?_ ?_
-    · show A.linear⁻¹ • (-A.translation) + A.linear⁻¹ • A.translation = 0
-      rw [← smul_add, neg_add_cancel, smul_zero]
-    · exact inv_mul_cancel A.linear
+@[simp] lemma OrthogonalToLinearIsometryEquiv_apply
+    (Q : Matrix.orthogonalGroup (Fin n) ℝ) (x : EuclideanSpace ℝ (Fin n)) :
+    OrthogonalToLinearIsometryEquiv Q x = Q • x := rfl
 
-/-- Inclusion of the Euclidean group into the Affine group. -/
-noncomputable def Euclidean.incl :
-    EuclideanGroup n →* AffineGroup n where
-  toFun A := ⟨A.translation, Matrix.GeneralLinearGroup.mkOfDetNeZero A.linear.val
-    (Matrix.isUnit_det_of_left_inverse A.linear.property.left).ne_zero⟩
+/-! ### `One`/`Mul` projection lemmas for `EuclideanGroup`
+
+These expose the semidirect-product formulas behind the `Group` instance so that `simp` can
+reduce the translation/linear components of `1` and `A * B`. -/
+
+@[simp] lemma EuclideanGroup.one_translation : (1 : EuclideanGroup n).translation = 0 := rfl
+@[simp] lemma EuclideanGroup.one_linear : (1 : EuclideanGroup n).linear = 1 := rfl
+@[simp] lemma EuclideanGroup.mul_translation (A B : EuclideanGroup n) :
+    (A * B).translation = A.translation + A.linear • B.translation := rfl
+@[simp] lemma EuclideanGroup.mul_linear (A B : EuclideanGroup n) :
+    (A * B).linear = A.linear * B.linear := rfl
+
+/-- The forward functor `⟨t, Q⟩ ↦ (x ↦ Q x + t)`, bundled as a monoid homomorphism from the
+Euclidean group into the affine isometry group of `EuclideanSpace ℝ (Fin n)`. -/
+noncomputable def Euclidean.toAffineIsometryHom :
+    EuclideanGroup n →*
+      AffineIsometryEquiv ℝ (EuclideanSpace ℝ (Fin n)) (EuclideanSpace ℝ (Fin n)) where
+  toFun A := AffineIsometryEquiv.constVAdd ℝ (EuclideanSpace ℝ (Fin n)) A.translation *
+    (OrthogonalToLinearIsometryEquiv A.linear).toAffineIsometryEquiv
   map_one' := by
-    refine AffineGroup.ext ?_ ?_
-    · rfl
-    · apply Units.ext
-      show (1 : Matrix.orthogonalGroup (Fin n) ℝ).val = (1 : Matrix (Fin n) (Fin n) ℝ)
-      rw [OneMemClass.coe_one]
-  map_mul' x y := by
-    refine AffineGroup.ext ?_ ?_
-    · rfl
-    · apply Units.ext
-      show ((x.linear * y.linear).val : Matrix (Fin n) (Fin n) ℝ)
-          = (x.linear.val * y.linear.val : Matrix (Fin n) (Fin n) ℝ)
-      rw [Submonoid.coe_mul]
+    apply AffineIsometryEquiv.ext
+    intro x; simp
+  map_mul' A B := by
+    apply AffineIsometryEquiv.ext
+    intro x
+    simp [mul_smul, add_assoc]
 
-/-- The inclusion of the Euclidean group into the affine group is injective. -/
-lemma Euclidean.incl_injective : Function.Injective (Euclidean.incl (n := n)) := by
-  intros x y hxy
-  unfold incl at hxy
-  simp at hxy
-  refine EuclideanGroup.ext ?_ ?_
-  · exact hxy.left
-  · apply Subtype.ext
-    exact congrArg Units.val hxy.right
+/-- Unfolds `Euclidean.toAffineIsometryHom` into its translation and linear factors. -/
+@[simp] lemma Euclidean.toAffineIsometryHom_apply (A : EuclideanGroup n) :
+    Euclidean.toAffineIsometryHom A =
+      AffineIsometryEquiv.constVAdd ℝ (EuclideanSpace ℝ (Fin n)) A.translation *
+        (OrthogonalToLinearIsometryEquiv A.linear).toAffineIsometryEquiv := rfl
 
-/-- The inclusion into the affine group preserves the rotation-translation decomposition; this is
-the `map_mul` transport of `ofRotationTranslation.decompose`. -/
-lemma Euclidean.incl_decompose (Q : Matrix.specialOrthogonalGroup (Fin n) ℝ)
-    (t : EuclideanSpace ℝ (Fin n)) :
-    Euclidean.incl (EuclideanGroup.ofRotationTranslation Q t) =
-      Euclidean.incl (translationVector.incl n (Multiplicative.ofAdd t)) *
-      Euclidean.incl (EuclideanGroup.ofRotation Q) := by
-  rw [ofRotationTranslation.decompose, map_mul]
+/-- `AffineIsometryEquiv.toAffineEquiv` bundled as a monoid homomorphism into the affine
+automorphism group. -/
+noncomputable def AffineIsometryEquiv.toAffineEquivHom :
+    AffineIsometryEquiv ℝ (EuclideanSpace ℝ (Fin n)) (EuclideanSpace ℝ (Fin n)) →*
+      AffineEquiv ℝ (EuclideanSpace ℝ (Fin n)) (EuclideanSpace ℝ (Fin n)) where
+  toFun e := e.toAffineEquiv
+  map_one' := by
+    apply AffineEquiv.ext; intro x; trivial
+  map_mul' e e' := by
+    apply AffineEquiv.ext; intro x; simp
 
-/-!
-## Connection to Mathlib's affine group
-
-The declarations below identify the concrete `AffineGroup n` with Mathlib's affine automorphism
-group `AffineEquiv ℝ (EuclideanSpace ℝ (Fin n)) _`, and transport the Euclidean inclusion across
-that identification.
--/
-
-/-- A general linear matrix viewed as a linear automorphism of `EuclideanSpace ℝ (Fin n)`. -/
-noncomputable def GLToLinEquiv (Q : Matrix.GeneralLinearGroup (Fin n) ℝ) :
-    EuclideanSpace ℝ (Fin n) ≃ₗ[ℝ] EuclideanSpace ℝ (Fin n) :=
-  DistribMulAction.toLinearEquiv ℝ _ Q
-
-/-- A linear automorphism of `EuclideanSpace ℝ (Fin n)`, read as a general linear matrix in the
-standard basis. -/
-noncomputable def LinEquivToGL
-    (e : EuclideanSpace ℝ (Fin n) ≃ₗ[ℝ] EuclideanSpace ℝ (Fin n)) :
-    Matrix.GeneralLinearGroup (Fin n) ℝ :=
-  let b := (EuclideanSpace.basisFun (Fin n) ℝ).toBasis
-  Matrix.GeneralLinearGroup.mkOfDetNeZero (LinearMap.toMatrix b b e)
-    (e.isUnit_det b b).ne_zero
-
-/-! ### Round-trip lemmas between `GLToLinEquiv` and `LinEquivToGL`
-
-These lemmas show that the two coordinate bridges are mutually inverse and that `GLToLinEquiv`
-is multiplicative. -/
-
-/-- Reading a linear automorphism as a matrix and back recovers the original automorphism. -/
-lemma GLToLinEquiv_linEquivToGL
-    (e : EuclideanSpace ℝ (Fin n) ≃ₗ[ℝ] EuclideanSpace ℝ (Fin n)) :
-    GLToLinEquiv (LinEquivToGL e) = e := by
-  apply LinearEquiv.ext
-  intro x
-  let b := (EuclideanSpace.basisFun (Fin n) ℝ).toBasis
-  change Matrix.toLin b b
-      (Matrix.GeneralLinearGroup.mkOfDetNeZero (LinearMap.toMatrix b b e) _ :
-        Matrix (Fin n) (Fin n) ℝ) x = e x
-  rw [Matrix.GeneralLinearGroup.val_mkOfDetNeZero, Matrix.toLin_toMatrix]
-  rfl
-
-/-- Viewing a general linear matrix as a linear automorphism and back recovers the original
-matrix. -/
-lemma linEquivToGL_GLToLinEquiv (Q : Matrix.GeneralLinearGroup (Fin n) ℝ) :
-    LinEquivToGL (GLToLinEquiv Q) = Q := by
-  apply Units.ext
-  let b := (EuclideanSpace.basisFun (Fin n) ℝ).toBasis
-  let e := Matrix.toLin b b Q
-  change (Matrix.GeneralLinearGroup.mkOfDetNeZero (LinearMap.toMatrix b b e) _ :
-      Matrix (Fin n) (Fin n) ℝ) = Q
-  rw [Matrix.GeneralLinearGroup.val_mkOfDetNeZero, LinearMap.toMatrix_toLin]
-
-/-- `GLToLinEquiv` sends products of matrices to compositions of linear automorphisms. -/
-lemma GLToLinEquiv_mul (Q Q' : Matrix.GeneralLinearGroup (Fin n) ℝ) :
-    GLToLinEquiv (Q * Q') = GLToLinEquiv Q * GLToLinEquiv Q' := by
-  ext v; simp [GLToLinEquiv, mul_smul]
-
-/-- The group isomorphism between `AffineGroup n = ℝⁿ ⋊ GL(n, ℝ)` and Mathlib's affine
-automorphism group. It sends `⟨t, Q⟩` to the affine equivalence `x ↦ Q x + t`. -/
-noncomputable def AffineGroup.toAffineEquiv :
-    AffineGroup n ≃* AffineEquiv ℝ (EuclideanSpace ℝ (Fin n)) (EuclideanSpace ℝ (Fin n)) where
-  toFun A := AffineEquiv.constVAdd ℝ (EuclideanSpace ℝ (Fin n)) A.translation *
-    (GLToLinEquiv A.linear).toAffineEquiv
-  invFun e := ⟨e 0, LinEquivToGL e.linear⟩
-  left_inv := by
-    intro A
-    refine AffineGroup.ext ?_ ?_
-    · simp only [AffineEquiv.coe_mul, Function.comp_apply,
-        LinearEquiv.coe_toAffineEquiv, AffineEquiv.constVAdd_apply,
-        map_zero]
-      rw [vadd_eq_add, add_zero]
-    · simp only
-      rw [← AffineEquiv.linearHom_apply, map_mul]
-      simp only [AffineEquiv.linearHom_apply]
-      change LinEquivToGL (1 * GLToLinEquiv A.linear) = A.linear
-      rw [one_mul]
-      exact linEquivToGL_GLToLinEquiv A.linear
-  right_inv := by
-    intro e
-    simp only [GLToLinEquiv_linEquivToGL]
-    apply AffineEquiv.ext; intro x
-    simp only [AffineEquiv.coe_mul, Function.comp_apply,
-        LinearEquiv.coe_toAffineEquiv, AffineEquiv.constVAdd_apply, vadd_eq_add]
-    rw [add_comm, ← vadd_eq_add, ← e.map_vadd 0 x, vadd_eq_add, add_zero]
-  map_mul' x y := by
-    apply AffineEquiv.ext; intro p
-    simp only [AffineEquiv.coe_mul, Function.comp_apply,
-      AffineEquiv.constVAdd_apply, LinearEquiv.coe_toAffineEquiv, vadd_eq_add,
-      GLToLinEquiv, DistribMulAction.toLinearEquiv_apply]
-    show x.translation + x.linear • y.translation + (x.linear * y.linear) • p =
-      x.translation + x.linear • (y.translation + y.linear • p)
-    simp [add_assoc, mul_smul]
-
-/-- The inclusion of the Euclidean group into Mathlib's affine automorphism group. -/
+/-- The inclusion of the Euclidean group into Mathlib's affine automorphism group, as the
+composite `EuclideanGroup →* AffineIsometryEquiv →* AffineEquiv`. -/
 noncomputable def Euclidean.toAffineEquiv :
     EuclideanGroup n →* AffineEquiv ℝ (EuclideanSpace ℝ (Fin n)) (EuclideanSpace ℝ (Fin n)) :=
-  (AffineGroup.toAffineEquiv (n := n)).toMonoidHom.comp Euclidean.incl
+  AffineIsometryEquiv.toAffineEquivHom.comp Euclidean.toAffineIsometryHom
+
+/-! ### Strengthening to an isomorphism
+
+The first leg `Euclidean.toAffineIsometryHom` is in fact a group isomorphism: every affine isometry
+of `EuclideanSpace ℝ (Fin n)` is `x ↦ Q x + t` for a unique orthogonal `Q` and translation `t`. We
+record this as a `MulEquiv`, reusing the forward functor above and adding the inverse together with
+the two round-trip identities. Nothing above this section depends on it. -/
+section EuclideanIsometryEquiv
+
+/-- A linear isometry equivalence read back as an orthogonal matrix, inverse to
+`OrthogonalToLinearIsometryEquiv` (see the round-trip `@[simp]` lemmas below). -/
+noncomputable def LinearIsometryEquivToOrthogonal
+    (L : EuclideanSpace ℝ (Fin n) ≃ₗᵢ[ℝ] EuclideanSpace ℝ (Fin n)) :
+    Matrix.orthogonalGroup (Fin n) ℝ :=
+   let b := EuclideanSpace.basisFun (Fin n) ℝ
+   ⟨LinearMap.toMatrix b.toBasis b.toBasis L.toLinearEquiv, by
+    have hb : LinearMap.toMatrix b.toBasis b.toBasis L.toLinearEquiv
+        = b.toBasis.toMatrix (b.map L) := by
+      ext i j
+      simp [LinearMap.toMatrix_apply, Module.Basis.toMatrix_apply,
+        OrthonormalBasis.map_apply, OrthonormalBasis.coe_toBasis_repr_apply]
+    rw [hb]
+    exact b.toMatrix_orthonormalBasis_mem_orthogonal (b.map L)⟩
+
+/-- `LinearIsometryEquivToOrthogonal` is a right inverse of `OrthogonalToLinearIsometryEquiv`. -/
+@[simp] lemma OrthogonalToLinearIsometryEquiv_right_inv
+    (L : EuclideanSpace ℝ (Fin n) ≃ₗᵢ[ℝ] EuclideanSpace ℝ (Fin n)) :
+    OrthogonalToLinearIsometryEquiv (LinearIsometryEquivToOrthogonal L) = L := by
+    apply LinearIsometryEquiv.ext; intro x
+    rw [OrthogonalToLinearIsometryEquiv_apply]
+    show Matrix.toEuclideanLin (LinearIsometryEquivToOrthogonal L).val x = L x
+    rw [Matrix.toEuclideanLin_eq_toLin_orthonormal]
+    show Matrix.toLin _ _
+        (LinearMap.toMatrix _ _
+          (L.toLinearEquiv : EuclideanSpace ℝ (Fin n) →ₗ[ℝ] EuclideanSpace ℝ (Fin n))) x = L x
+    rw [Matrix.toLin_toMatrix]
+    rfl
+
+/-- `LinearIsometryEquivToOrthogonal` is a left inverse of `OrthogonalToLinearIsometryEquiv`. -/
+@[simp] lemma OrthogonalToLinearIsometryEquiv_left_inv
+    (Q : Matrix.orthogonalGroup (Fin n) ℝ) :
+    LinearIsometryEquivToOrthogonal (OrthogonalToLinearIsometryEquiv Q) = Q := by
+  apply Subtype.ext
+  have hlin :
+      ((OrthogonalToLinearIsometryEquiv Q).toLinearEquiv :
+          EuclideanSpace ℝ (Fin n) →ₗ[ℝ] EuclideanSpace ℝ (Fin n))
+        = Matrix.toLin (EuclideanSpace.basisFun (Fin n) ℝ).toBasis
+            (EuclideanSpace.basisFun (Fin n) ℝ).toBasis Q.val := by
+    ext x; rfl
+  show LinearMap.toMatrix _ _
+      ((OrthogonalToLinearIsometryEquiv Q).toLinearEquiv :
+        EuclideanSpace ℝ (Fin n) →ₗ[ℝ] EuclideanSpace ℝ (Fin n)) = Q.val
+  rw [hlin, LinearMap.toMatrix_toLin]
+
+/-- The affine map `x ↦ t +ᵥ L x`, projected to its linear isometry component, is `L`. -/
+@[simp] lemma linearIsometryEquiv_constVAdd_mul
+    (t : EuclideanSpace ℝ (Fin n))
+    (L : EuclideanSpace ℝ (Fin n) ≃ₗᵢ[ℝ] EuclideanSpace ℝ (Fin n)) :
+    ((AffineIsometryEquiv.constVAdd ℝ (EuclideanSpace ℝ (Fin n)) t *
+        L.toAffineIsometryEquiv).linearIsometryEquiv) = L := by
+  apply LinearIsometryEquiv.ext; intro x
+  have h := (AffineIsometryEquiv.constVAdd ℝ (EuclideanSpace ℝ (Fin n)) t *
+      L.toAffineIsometryEquiv).map_vsub x 0
+  rw [vsub_eq_sub, sub_zero] at h
+  rw [h]
+  simp
+
+/-- `EuclideanGroup n ≃* AffineIsometryEquiv ℝ (EuclideanSpace ℝ (Fin n)) _`: the Euclidean group
+is the group of affine isometries of Euclidean space. -/
+noncomputable def Euclidean.toAffineIsometryEquiv :
+    EuclideanGroup n ≃*
+      AffineIsometryEquiv ℝ (EuclideanSpace ℝ (Fin n)) (EuclideanSpace ℝ (Fin n)) where
+  toFun := Euclidean.toAffineIsometryHom
+  invFun e := ⟨e 0, LinearIsometryEquivToOrthogonal e.linearIsometryEquiv⟩
+  left_inv A := by
+    refine EuclideanGroup.ext ?_ ?_
+    · simp
+    · simp [linearIsometryEquiv_constVAdd_mul, OrthogonalToLinearIsometryEquiv_left_inv]
+  right_inv e := by
+    apply AffineIsometryEquiv.ext; intro x
+    simp only [Euclidean.toAffineIsometryHom_apply,
+      OrthogonalToLinearIsometryEquiv_right_inv,
+      AffineIsometryEquiv.coe_mul, Function.comp_apply,
+      LinearIsometryEquiv.coe_toAffineIsometryEquiv,
+      AffineIsometryEquiv.coe_constVAdd, vadd_eq_add]
+    have h := e.map_vadd 0 x
+    simp [vadd_eq_add, add_zero] at h
+    rw [h, add_comm]
+  map_mul' := Euclidean.toAffineIsometryHom.map_mul'
+
+/-- `Euclidean.toAffineIsometryEquiv` agrees with `Euclidean.toAffineIsometryHom`. -/
+@[simp] lemma Euclidean.toAffineIsometryEquiv_apply (A : EuclideanGroup n) :
+    Euclidean.toAffineIsometryEquiv A = Euclidean.toAffineIsometryHom A := rfl
+
+end EuclideanIsometryEquiv
