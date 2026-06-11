@@ -29,6 +29,8 @@ structure EuclideanGroup (n : ℕ) where
   /-- The orthogonal linear part of a Euclidean transformation. -/
   linear : Matrix.orthogonalGroup (Fin n) ℝ
 
+namespace EuclideanGroup
+
 /-- Group structure on `E(n) = ℝ^n ⋊ O(n)`. The orthogonal component acts on translations by
 the inherited matrix-vector action on `EuclideanSpace ℝ (Fin n)`, transported through `WithLp`
 from the coordinate action `Q.val *ᵥ v.ofLp`. -/
@@ -57,6 +59,21 @@ noncomputable instance : Group (EuclideanGroup n) where
     · show A.linear⁻¹ • (-A.translation) + A.linear⁻¹ • A.translation = 0
       rw [← smul_add, neg_add_cancel, smul_zero]
     · exact inv_mul_cancel A.linear
+
+/-! ### `One`/`Mul` projection lemmas
+
+These expose the semidirect-product formulas behind the `Group` instance so that `simp` can
+reduce the translation/linear components of `1` and `A * B`. -/
+
+@[simp] lemma one_translation : (1 : EuclideanGroup n).translation = 0 := rfl
+
+@[simp] lemma one_linear : (1 : EuclideanGroup n).linear = 1 := rfl
+
+@[simp] lemma mul_translation (A B : EuclideanGroup n) :
+    (A * B).translation = A.translation + A.linear • B.translation := rfl
+
+@[simp] lemma mul_linear (A B : EuclideanGroup n) :
+    (A * B).linear = A.linear * B.linear := rfl
 
 private lemma det_coe_inv {n : ℕ} (Q : Matrix.orthogonalGroup (Fin n) ℝ) :
     (Q⁻¹).val.det = (Q.val.det)⁻¹ := by
@@ -226,7 +243,7 @@ noncomputable def RotationsAbout.fromOrigin :
 
 /-- `RotationsAbout.toOrigin p` followed by `RotationsAbout.fromOrigin p` is the identity; the
 forward leg of the isomorphism `RotationsAboutEquiv`. -/
-lemma RotationsAbout_forward_identity :
+lemma RotationsAbout.fromOrigin_comp_toOrigin :
     (RotationsAbout.fromOrigin p).comp (RotationsAbout.toOrigin p) =
       MonoidHom.id (RotationsAbout p) := by
   apply MonoidHom.ext
@@ -239,7 +256,7 @@ lemma RotationsAbout_forward_identity :
 
 /-- `RotationsAbout.fromOrigin p` followed by `RotationsAbout.toOrigin p` is the identity; the
 backward leg of the isomorphism `RotationsAboutEquiv`. -/
-lemma RotationsAbout_backward_identity :
+lemma RotationsAbout.toOrigin_comp_fromOrigin :
     (RotationsAbout.toOrigin p).comp (RotationsAbout.fromOrigin p) =
       MonoidHom.id (RotationGroup n) := by
   apply MonoidHom.ext
@@ -254,7 +271,7 @@ lemma RotationsAbout_backward_identity :
 isomorphic to the rotations about the origin `RotationGroup n`. -/
 noncomputable def RotationsAboutEquiv : RotationsAbout p ≃* RotationGroup n :=
   MonoidHom.toMulEquiv (RotationsAbout.toOrigin p) (RotationsAbout.fromOrigin p)
-    (RotationsAbout_forward_identity p) (RotationsAbout_backward_identity p)
+    (RotationsAbout.fromOrigin_comp_toOrigin p) (RotationsAbout.toOrigin_comp_fromOrigin p)
 
 /-- API feature: the degenerate identity that `RotationsAbout 0 = RotationGroup n` -/
 lemma RotationsAbout_zero : RotationsAbout (0 : EuclideanSpace ℝ (Fin n)) = RotationGroup n := by
@@ -276,32 +293,32 @@ def specialOrthogonal.incl (n : ℕ) :
   Submonoid.inclusion Matrix.specialUnitaryGroup_le_unitaryGroup
 
 /-- The Euclidean group element given by a rotation about the origin (zero translation). -/
-def EuclideanGroup.ofRotation (Q : Matrix.specialOrthogonalGroup (Fin n) ℝ) :
+def ofRotation (Q : Matrix.specialOrthogonalGroup (Fin n) ℝ) :
     EuclideanGroup n := ⟨0, specialOrthogonal.incl n Q⟩
 
 /-- Specialization to a group element from a rotation and a translation. -/
-def EuclideanGroup.ofRotationTranslation (Q : Matrix.specialOrthogonalGroup (Fin n) ℝ)
+def ofRotationTranslation (Q : Matrix.specialOrthogonalGroup (Fin n) ℝ)
     (t : EuclideanSpace ℝ (Fin n)) : EuclideanGroup n :=
   ⟨t, specialOrthogonal.incl n Q⟩
 
 /-- The specialization projects back to the translation component. -/
 @[simp]
-lemma ofRotationTranslation.toTranslation (Q : Matrix.specialOrthogonalGroup (Fin n) ℝ)
+lemma ofRotationTranslation_translation (Q : Matrix.specialOrthogonalGroup (Fin n) ℝ)
     (t : EuclideanSpace ℝ (Fin n)) :
-    (EuclideanGroup.ofRotationTranslation Q t).translation = t := rfl
+    (ofRotationTranslation Q t).translation = t := rfl
 
-/-- The specialization projects back to the rotation component. -/
+/-- The specialization projects back to the linear (rotation) component. -/
 @[simp]
-lemma ofRotationTranslation.toRotation (Q : Matrix.specialOrthogonalGroup (Fin n) ℝ)
+lemma ofRotationTranslation_linear (Q : Matrix.specialOrthogonalGroup (Fin n) ℝ)
     (t : EuclideanSpace ℝ (Fin n)) :
-    (EuclideanGroup.ofRotationTranslation Q t).linear = specialOrthogonal.incl n Q := rfl
+    (ofRotationTranslation Q t).linear = specialOrthogonal.incl n Q := rfl
 
 /-- API feature: the inclusion image decomposes as group product. -/
 @[simp]
-lemma ofRotationTranslation.decompose (Q : Matrix.specialOrthogonalGroup (Fin n) ℝ)
+lemma ofRotationTranslation_decompose (Q : Matrix.specialOrthogonalGroup (Fin n) ℝ)
     (t : EuclideanSpace ℝ (Fin n)) :
-    (EuclideanGroup.ofRotationTranslation Q t) =
-    (translationVector.incl n (Multiplicative.ofAdd t)) * (EuclideanGroup.ofRotation (Q)) := by
+    (ofRotationTranslation Q t) =
+    (translationVector.incl n (Multiplicative.ofAdd t)) * (ofRotation (Q)) := by
   refine EuclideanGroup.ext ?_ ?_
   · show t = t + (1 : Matrix.orthogonalGroup (Fin n) ℝ) • 0
     rw [smul_zero, add_zero]
@@ -311,11 +328,11 @@ lemma ofRotationTranslation.decompose (Q : Matrix.specialOrthogonalGroup (Fin n)
 /-- The isomorphism's forward map: a special orthogonal matrix as a rotation about the origin. -/
 noncomputable def specialOrthogonal.toRotation (n : ℕ) :
     Matrix.specialOrthogonalGroup (Fin n) ℝ →* RotationGroup n where
-  toFun g := ⟨EuclideanGroup.ofRotation g, by
+  toFun g := ⟨ofRotation g, by
       refine ⟨?_, ?_⟩
-      · show (EuclideanGroup.ofRotation g).linear.val.det = 1
+      · show (ofRotation g).linear.val.det = 1
         exact (Matrix.mem_specialOrthogonalGroup_iff.mp g.property).right
-      · show (EuclideanGroup.ofRotation g).translation = 0
+      · show (ofRotation g).translation = 0
         rfl⟩
   map_one' := rfl
   map_mul' x y := by
@@ -338,7 +355,7 @@ noncomputable def specialOrthogonal.fromRotation (n : ℕ) :
 
 /-- `specialOrthogonal.toRotation n` followed by `specialOrthogonal.fromRotation n` is the identity;
 the forward leg of the isomorphism `specialOrthogonalEquiv`. -/
-lemma specialOrthogonal_forward_identity :
+lemma specialOrthogonal.fromRotation_comp_toRotation :
     (specialOrthogonal.fromRotation n).comp (specialOrthogonal.toRotation n) =
       MonoidHom.id (Matrix.specialOrthogonalGroup (Fin n) ℝ) := by
   apply MonoidHom.ext
@@ -347,7 +364,7 @@ lemma specialOrthogonal_forward_identity :
 
 /-- `specialOrthogonal.fromRotation n` followed by `specialOrthogonal.toRotation n` is the identity;
 the backward leg of the isomorphism `specialOrthogonalEquiv`. -/
-lemma specialOrthogonal_backward_identity :
+lemma specialOrthogonal.toRotation_comp_fromRotation :
     (specialOrthogonal.toRotation n).comp (specialOrthogonal.fromRotation n) =
       MonoidHom.id (RotationGroup n) := by
   apply MonoidHom.ext
@@ -363,4 +380,6 @@ lemma specialOrthogonal_backward_identity :
 noncomputable def specialOrthogonalEquiv :
     Matrix.specialOrthogonalGroup (Fin n) ℝ ≃* RotationGroup n :=
     MonoidHom.toMulEquiv (specialOrthogonal.toRotation n) (specialOrthogonal.fromRotation n)
-    (specialOrthogonal_forward_identity) (specialOrthogonal_backward_identity)
+    specialOrthogonal.fromRotation_comp_toRotation specialOrthogonal.toRotation_comp_fromRotation
+
+end EuclideanGroup
