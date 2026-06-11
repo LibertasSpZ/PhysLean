@@ -16,6 +16,19 @@ In this module we develop the basics for the spectral theory of closed unbounded
 This forms the basis for the spectral theory of self-adjoint unbounded operators,
 which are of central importance in quantum mechanics.
 
+Definitions for subsets of ℂ associated to an operator `T : H →ₗ.[ℂ] H` vary by author.
+Here we adopt those used in
+[Konrad Schmüdgen, *Unbounded Self-Adjoint Operators on Hilbert Space*][Schmudgen2012],
+summarized in the following table:
+
+| Subset of ℂ | abbrev. | `D(T - z)` | `R(T - z)` | `(T - z)⁻¹` |
+| :---------- | :-----: | :--------: | :--------: | :---------: |
+| Regularity domain | | `= ⊥` | | continuous |
+| Resolvent set | `ρ` | `= ⊥` | `= ⊤` | continuous |
+| Point spectrum | `σᵖ` | `≠ ⊥` | | |
+| Residual spectrum | `σʳ` | `= ⊥` | `≠ ⊤` | continuous |
+| Continuous spectrum | `σᶜ` | | not closed | |
+
 ## ii. Key results
 
 Definitions (corresponding to an operator `T : H →ₗ.[ℂ] H`)
@@ -29,6 +42,13 @@ Definitions (corresponding to an operator `T : H →ₗ.[ℂ] H`)
     the unit sphere in `T.domain`.
 - `LinearPMap.resolventSet` (`ρ`) : The set of complex numbers `z` for which `T - z • 1`
     has a continuous (equivalently, bounded) inverse with domain all of `H`.
+- `LinearPMap.spectrum` (`σ`) : The complement of the resolvent set.
+- `LinearPMap.pointSpectrum` (`σᵖ`) : The set of complex numbers `z` for which `T - z • 1`
+    fails to be invertible.
+- `LinearPMap.residualSpectrum` (`σʳ`) : The set of complex numbers `z` for which `T - z • 1`
+    has a continuous (equivalently, bounded) inverse with domain not all of `H`.
+- `LinearPMap.continuousSpectrum` (`σᶜ`) : The set of complex numbers `z` for which
+    the range of `T - z • 1` is not dense in `H`.
 
 Main results
 - `regularityDomain_isOpen` : The regularity domain is an open subset of `ℂ`.
@@ -39,7 +59,10 @@ Main results
 - `compl_closure_numericalRange_subset_regularityDomain` : The regularity domain contains
     the exterior of the numerical range.
 - `numericalRange_convex` : The Toeplitz-Hausdorff theorem — the numerical range is a convex set.
-- `resolventSet_isOpen` : The resolvent set is an open subset of ℂ.
+- `resolventSet_isOpen` and `spectrum_isClosed` : The resolvent set is an open subset of ℂ
+    and its complement, the spectrum, is closed.
+- `IsClosed.spectrum_eq` : For a closed operator the spectrum is the union of the point, residual
+    and continuous spectra.
 
 ## iii. Table of contents
 
@@ -49,6 +72,11 @@ Main results
   - C.1. The Toeplitz-Hausdorff theorem
 - D. Spectrum of a closed operator
   - D.1. Resolvent set
+  - D.2. Spectrum
+    - D.2.1. Point spectrum
+    - D.2.2. Residual spectrum
+    - D.2.3. Continuous spectrum
+  - D.3. Spectrum decomposition
 
 ## iv. References
 
@@ -613,6 +641,129 @@ lemma resolventSet_isOpen [CompleteSpace H] (T : H →ₗ.[ℂ] H) : IsOpen (ρ 
     · exact T.regularityDomain_isOpen.connectedComponentIn
     · exact mem_connectedComponentIn hz₁.1
   · simp [resolventSet_eq_empty hT]
+
+/-!
+### D.2. Spectrum
+-/
+
+/-- The spectrum, `σ`, of a partial linear map.
+
+  `σ T` is the complement of `ρ T`. A complex number `z` is in `σ T` iff the linear map `T - z • 1`
+  from `T.domain` to `H` fails to be bijective or `(T - z • 1)⁻¹` is not continuous
+  (equivalently, is not bounded). -/
+def spectrum (T : H →ₗ.[ℂ] H) : Set ℂ := (ρ T)ᶜ
+
+@[inherit_doc spectrum]
+local notation "σ" => spectrum
+
+lemma spectrum_eq (T : H →ₗ.[ℂ] H) : σ T = (ρ T)ᶜ := rfl
+
+lemma mem_spectrum_iff {T : H →ₗ.[ℂ] H} {z : ℂ} :
+    z ∈ σ T ↔ (T - z • 1).toFun.ker ≠ ⊥ ∨ (T - z • 1).toFun.range ≠ ⊤ ∨ ¬Continuous (𝑅 T z) := by
+  rw [spectrum_eq, mem_compl_iff, mem_resolventSet_iff]
+  tauto
+
+/-- If an operator is not closed then its spectrum is all of ℂ. -/
+lemma spectrum_eq_univ [CompleteSpace H] {T : H →ₗ.[ℂ] H} (h : ¬T.IsClosed) : σ T = univ :=
+  compl_empty ▸ compl_inj_iff.mpr (resolventSet_eq_empty h)
+
+/-- The spectrum is a closed subset of ℂ. -/
+lemma spectrum_isClosed [CompleteSpace H] (T : H →ₗ.[ℂ] H) : _root_.IsClosed (σ T) :=
+  T.resolventSet_isOpen.isClosed_compl
+
+/-!
+#### D.2.1. Point spectrum
+-/
+
+/-- The point spectrum, `σᵖ`, of a partial linear map.
+
+  A complex number `z` is in `σᵖ T` iff `T - z • 1` is not injective. -/
+def pointSpectrum (T : H →ₗ.[ℂ] H) : Set ℂ := {z : ℂ | (T - z • 1).toFun.ker ≠ ⊥}
+
+@[inherit_doc pointSpectrum]
+local notation "σᵖ" => pointSpectrum
+
+lemma pointSpectrum_eq (T : H →ₗ.[ℂ] H) : σᵖ T = {z | (T - z • 1).toFun.ker ≠ ⊥} := rfl
+
+lemma mem_pointSpectrum_iff {T : H →ₗ.[ℂ] H} {z : ℂ} : z ∈ σᵖ T ↔ (T - z • 1).toFun.ker ≠ ⊥ :=
+  Iff.rfl
+
+lemma pointSpectrum_subset_spectrum (T : H →ₗ.[ℂ] H) : σᵖ T ⊆ σ T :=
+  fun _ h ↦ mem_spectrum_iff.mpr (Or.inl h)
+
+/-!
+#### D.2.2. Residual spectrum
+-/
+
+/-- The residual spectrum, `σʳ`, of a partial linear map.
+
+  A complex number `z` is in `σʳ T` iff `T - z • 1` is injective but not surjective
+  and `(T - z • 1)⁻¹` is continuous (equivalently, bounded). -/
+def residualSpectrum (T : H →ₗ.[ℂ] H) : Set ℂ :=
+  {z : ℂ | (T - z • 1).toFun.ker = ⊥ ∧ (T - z • 1).toFun.range ≠ ⊤ ∧ Continuous (𝑅 T z)}
+
+@[inherit_doc residualSpectrum]
+local notation "σʳ" => residualSpectrum
+
+lemma residualSpectrum_eq (T : H →ₗ.[ℂ] H) :
+    σʳ T = {z | (T - z • 1).toFun.ker = ⊥ ∧ (T - z • 1).toFun.range ≠ ⊤ ∧ Continuous (𝑅 T z)} :=
+  rfl
+
+lemma mem_residualSpectrum_iff {T : H →ₗ.[ℂ] H} {z : ℂ} :
+    z ∈ σʳ T ↔ (T - z • 1).toFun.ker = ⊥ ∧ (T - z • 1).toFun.range ≠ ⊤ ∧ Continuous (𝑅 T z) :=
+  Iff.rfl
+
+lemma residualSpectrum_subset_spectrum (T : H →ₗ.[ℂ] H) : σʳ T ⊆ σ T :=
+  fun _ ⟨_, h, _⟩ ↦ mem_spectrum_iff.mpr (Or.inr <| Or.inl h)
+
+/-!
+#### D.2.3. Continuous spectrum
+-/
+
+/-- The continuous spectrum, `σᶜ`, of a partial linear map.
+
+  A complex number `z` is in `σᶜ T` iff the range of `T - z • 1` is not closed. -/
+def continuousSpectrum (T : H →ₗ.[ℂ] H) : Set ℂ :=
+  {z : ℂ | ¬_root_.IsClosed ((T - z • 1).toFun.range : Set H)}
+
+@[inherit_doc continuousSpectrum]
+local notation "σᶜ" => continuousSpectrum
+
+lemma continuousSpectrum_eq (T : H →ₗ.[ℂ] H) :
+    σᶜ T = {z | ¬_root_.IsClosed ((T - z • 1).toFun.range : Set H)} := rfl
+
+lemma mem_continuousSpectrum_iff {T : H →ₗ.[ℂ] H} {z : ℂ} :
+    z ∈ σᶜ T ↔ ¬_root_.IsClosed ((T - z • 1).toFun.range : Set H) := Iff.rfl
+
+lemma continuousSpectrum_subset_spectrum (T : H →ₗ.[ℂ] H) : σᶜ T ⊆ σ T :=
+  fun _ h ⟨_, h_range, _⟩ ↦ h (by simp [h_range])
+
+/-!
+### D.3. Spectrum decomposition
+-/
+
+lemma IsClosed.spectrum_eq [CompleteSpace H] {T : H →ₗ.[ℂ] H} (hT : T.IsClosed) :
+    σ T = σᵖ T ∪ σʳ T ∪ σᶜ T := by
+  refine Subset.antisymm ?_ ?_
+  · intro z hσ
+    apply mem_spectrum_iff.mp at hσ
+    rcases eq_or_ne (T - z • 1).toFun.ker ⊥ with h_ker | h_ker
+    · by_cases h_cont : Continuous (𝑅 T z)
+      · left; right; exact ⟨h_ker, (hσ.neg_resolve_left h_ker).neg_resolve_right h_cont, h_cont⟩
+      · right
+        rw [mem_continuousSpectrum_iff, ← inverse_domain]
+        refine fun h ↦ h_cont ?_
+        refine continuous_of_isClosed_domain ?_ h
+        apply (inverse_closed_iff h_ker).mpr
+        exact hT.sub_continuous (Continuous.const_smul (by fun_prop) _) le_top
+    · left; left; exact h_ker
+  · refine union_subset ?_ T.continuousSpectrum_subset_spectrum
+    exact union_subset T.pointSpectrum_subset_spectrum T.residualSpectrum_subset_spectrum
+
+lemma pointSpectrum_inter_residualSpectrum (T : H →ₗ.[ℂ] H) : σᵖ T ∩ σʳ T = ∅ := by
+  ext
+  simp only [mem_inter_iff, mem_empty_iff_false, iff_false, not_and]
+  exact fun h h' ↦ h h'.1
 
 end
 
