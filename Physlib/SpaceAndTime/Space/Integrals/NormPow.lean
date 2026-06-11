@@ -5,6 +5,7 @@ Authors: Gregory J. Loges
 -/
 module
 
+public import Physlib.SpaceAndTime.Space.IsDistBounded
 public import Physlib.SpaceAndTime.Space.Module
 public import Mathlib.MeasureTheory.Constructions.HaarToSphere
 public import Mathlib.Analysis.SpecialFunctions.ImproperIntegrals
@@ -28,6 +29,8 @@ The integrability of `x ↦ ‖x‖ᵖ` on `ball 0 b` and `(ball 0 b)ᶜ` follow
     with `0 ∉ closure s`.
 - `integrableOn_norm_rpow_of_compl_nhds`: A sufficient condition for integrability on `s`
     with `0 ∉ closure s`.
+- `radial_norm_power_spherical_integral_eq_space_integral`: The spherical-coordinate integral
+    identity for integer powers of the norm against a Schwartz map.
 
 ## iii. Table of contents
 
@@ -39,7 +42,7 @@ The integrability of `x ↦ ‖x‖ᵖ` on `ball 0 b` and `(ball 0 b)ᶜ` follow
 
 namespace Space
 
-open MeasureTheory
+open MeasureTheory SchwartzMap
 
 private lemma npow_indicator_rpow_eq {n : ℕ} {s : Set ℝ} (hs : 0 ∉ s) (p : ℝ) :
     (fun r ↦ r ^ n • s.indicator (fun r ↦ r ^ p) r) = s.indicator (fun r ↦ r ^ (n + p)) := by
@@ -47,6 +50,59 @@ private lemma npow_indicator_rpow_eq {n : ℕ} {s : Set ℝ} (hs : 0 ∉ s) (p :
   by_cases hr : r ∈ s
   · grind [Set.indicator_of_mem, smul_eq_mul, add_comm, Real.rpow_add_natCast]
   · simp [hr]
+
+lemma radial_jacobian_zpow_mul_self
+    {d p : ℕ} {q : ℤ} (hp_int : (p : ℤ) = q + (d.succ : ℤ))
+    {r : ℝ} (hr : 0 < r) :
+    r ^ d * (r ^ q * r) = r ^ p := by
+  have hz : r ≠ 0 := ne_of_gt hr
+  calc
+    r ^ d * (r ^ q * r)
+        = r ^ (d : ℤ) * (r ^ q * r ^ (1 : ℤ)) := by
+            rw [zpow_natCast, zpow_one]
+    _ = r ^ ((d : ℤ) + (q + 1)) := by
+            rw [← zpow_add₀ hz q 1, ← zpow_add₀ hz (d : ℤ) (q + 1)]
+    _ = r ^ (p : ℤ) := by
+            congr 1; omega
+    _ = r ^ p := by
+            rw [zpow_natCast]
+
+private lemma radial_jacobian_zpow
+    {d p : ℕ} {q : ℤ} (hp_int : (p : ℤ) = q + (d.succ : ℤ))
+    (hp_pos : 0 < p) {r : ℝ} (hr : 0 < r) :
+    r ^ d * r ^ q = r ^ (p - 1) := by
+  have hz : r ≠ 0 := ne_of_gt hr
+  calc
+    r ^ d * r ^ q
+        = r ^ ((d : ℤ) + q) := by
+            rw [← zpow_natCast r d, ← zpow_add₀ hz (d : ℤ) q]
+    _ = r ^ ((p - 1 : ℕ) : ℤ) := by
+            congr 1; omega
+    _ = r ^ (p - 1) := by
+            rw [zpow_natCast]
+
+lemma radial_norm_power_spherical_integral_eq_space_integral
+    {d p : ℕ} {q : ℤ} (hp_int : (p : ℤ) = q + (d.succ : ℤ))
+    (hp_pos : 0 < p) (η : 𝓢(Space d.succ, ℝ)) :
+    ∫ x : Space d.succ, η x * ‖x‖ ^ q =
+      ∫ (n : ↑(Metric.sphere (0 : Space d.succ) 1)),
+        ∫ (r : Set.Ioi (0 : ℝ)),
+          r.1 ^ (p - 1) * η (r.1 • n.1)
+          ∂(.comap Subtype.val volume)
+        ∂(volume (α := Space d.succ).toSphere) := by
+  have hf : Integrable (fun x : Space d.succ => η x * ‖x‖ ^ q) volume :=
+    IsDistBounded.integrable_space_mul (IsDistBounded.pow q (by omega)) η
+  rw [integral_volume_eq_spherical_integral
+    (d := d) (fun x : Space d.succ => η x * ‖x‖ ^ q) hf]
+  congr
+  funext n
+  congr
+  funext r
+  have hr : 0 < (r : ℝ) := r.2
+  have hnorm := norm_smul_sphere n (le_of_lt hr)
+  simp only [smul_eq_mul]
+  rw [hnorm, ← radial_jacobian_zpow hp_int hp_pos hr]
+  ring
 
 /-- The function `x ↦ ‖x‖ᵖ` is integrable on `{x : Space d | 0 ≤ ‖x‖ < b}` iff `0 < d + p`. -/
 lemma integrableOn_norm_rpow_ball_iff {d : ℕ} (hd : 0 < d) {b : ℝ} (hb : 0 < b) (p : ℝ) :

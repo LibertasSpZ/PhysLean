@@ -155,6 +155,47 @@ lemma integral_volume_eq_spherical (d : ℕ) (f : Space d.succ → F)
   field_simp
   simp
 
+lemma integrable_spherical_of_integrable {d : ℕ} {F : Type*}
+    [NormedAddCommGroup F] [NormedSpace ℝ F] {f : Space d.succ → F}
+    (hf : Integrable f volume) :
+    Integrable
+      (fun x : ↑(Metric.sphere (0 : Space d.succ) 1) × Set.Ioi (0 : ℝ) =>
+        f (x.2.1 • x.1.1))
+      (volume (α := Space d.succ).toSphere.prod
+        (Measure.volumeIoiPow (Module.finrank ℝ (Space d.succ) - 1))) := by
+  let s : Set (Space d.succ) := {0}ᶜ
+  have h1 : Integrable (fun x : s => f x.1)
+      (.comap (Subtype.val (p := fun x => x ∈ s)) volume) := by
+    change Integrable (f ∘ Subtype.val)
+      (.comap (Subtype.val (p := fun x => x ∈ s)) volume)
+    rw [← MeasureTheory.integrableOn_iff_comap_subtypeVal]
+    · exact hf.integrableOn
+    · simp [s]
+  have he := MeasureTheory.Measure.measurePreserving_homeomorphUnitSphereProd
+    (volume (α := Space d.succ))
+  have hcomp :
+      Integrable
+        ((fun x : s => f x.1) ∘ (homeomorphUnitSphereProd (Space d.succ)).symm)
+        (volume (α := Space d.succ).toSphere.prod
+          (Measure.volumeIoiPow (Module.finrank ℝ (Space d.succ) - 1))) := by
+    rw [← he.integrable_comp_emb]
+    · convert h1
+      simp only [Nat.succ_eq_add_one, Function.comp_apply, Homeomorph.symm_apply_apply]
+    · exact Homeomorph.measurableEmbedding (homeomorphUnitSphereProd (Space d.succ))
+  convert hcomp using 1
+
+lemma integral_volume_eq_spherical_iterated {d : ℕ} {F : Type*}
+    [NormedAddCommGroup F] [NormedSpace ℝ F] (f : Space d.succ → F)
+    (hf : Integrable f volume) :
+    ∫ x : Space d.succ, f x =
+      ∫ n : ↑(Metric.sphere (0 : Space d.succ) 1),
+        ∫ r : Set.Ioi (0 : ℝ), f (r.1 • n.1)
+          ∂(Measure.volumeIoiPow (Module.finrank ℝ (Space d.succ) - 1))
+        ∂(volume (α := Space d.succ).toSphere) := by
+  rw [integral_volume_eq_spherical]
+  rw [MeasureTheory.integral_prod]
+  exact integrable_spherical_of_integrable hf
+
 /- An instance of `sfinite` on the spherical integral measure on `Space d`.
   This is needed in many of the calculations related to spherical integrals,
   but cannot be inferred by Lean without this. -/
@@ -184,6 +225,24 @@ instance : SFinite (@Measure.comap ↑(Set.Ioi 0) ℝ Subtype.instMeasurableSpac
         exact hs
         apply MeasurableEmbedding.subtype_coe
         simp
+
+lemma integral_volume_eq_spherical_integral {d : ℕ} {F : Type*}
+    [NormedAddCommGroup F] [NormedSpace ℝ F] (f : Space d.succ → F)
+    (hf : Integrable f volume) :
+    ∫ x : Space d.succ, f x =
+      ∫ n : ↑(Metric.sphere (0 : Space d.succ) 1),
+        ∫ r : Set.Ioi (0 : ℝ), (r.1 ^ d) • f (r.1 • n.1)
+          ∂(.comap Subtype.val volume)
+        ∂(volume (α := Space d.succ).toSphere) := by
+  rw [integral_volume_eq_spherical_iterated f hf]
+  congr
+  funext n
+  simp [Measure.volumeIoiPow]
+  erw [integral_withDensity_eq_integral_smul (by fun_prop)]
+  congr
+  funext r
+  have hr : 0 ≤ (r : ℝ) := le_of_lt r.2
+  rw [NNReal.smul_def, Real.coe_toNNReal _ (pow_nonneg hr d)]
 
 /-!
 
