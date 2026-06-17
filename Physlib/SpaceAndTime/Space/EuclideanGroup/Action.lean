@@ -130,7 +130,7 @@ lemma rotation_dist_smul (r : RotationGroup d) (p q : Space d) :
 `p ↦ p -ᵥ origin`, the Part 1 action is the transport of `toAffineIsometryMulEquiv`
 (`AffineGroup.lean`) from `EuclideanSpace` to `Space`. Nothing in Parts 1–2 depends on it. -/
 
-/-- **The unification bridge.** Under the standard chart, the Euclidean action on `Space d` is the
+/-- Under the standard chart, the Euclidean action on `Space d` is the
 transport of `toAffineIsometryMulEquiv` acting on `EuclideanSpace`:
 `chart (g • p) = (toAffineIsometryMulEquiv g) (chart p)`. -/
 lemma chartEuclidean_smul (g : EuclideanGroup d) (p : Space d) :
