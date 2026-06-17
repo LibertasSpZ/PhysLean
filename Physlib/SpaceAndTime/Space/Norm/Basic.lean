@@ -5,7 +5,7 @@ Authors: Joseph Tooby-Smith
 -/
 module
 
-public import Physlib.SpaceAndTime.Space.Derivatives.Div
+public import Physlib.SpaceAndTime.Space.Derivatives.Laplacian
 public import Physlib.SpaceAndTime.Space.Integrals.NormPow
 public import Physlib.Mathematics.Distribution.PowMul
 /-!
@@ -31,8 +31,12 @@ We use properties of this power series to prove various results about distributi
   of the norm.
 - `distDiv_norm_zpow_smul_repr_self_eq_smul` : The divergence of the distribution defined by
   `x ↦ ‖x‖ ^ q • x`.
+- `distLaplacian_distOfFunction_norm_zpow` : The Laplacian of the distribution defined by a power
+  of the norm.
 - `distDiv_inv_pow_eq_dim` : The divergence of the distribution defined by the
   inverse power of the norm proportional to the Dirac delta distribution.
+- `distLaplacian_fundamentalSolution_norm_zpow_eq` : The Laplacian of the fundamental
+  solution power of the norm.
 
 ## iii. Table of contents
 
@@ -54,7 +58,9 @@ We use properties of this power series to prove various results about distributi
   - B.1. The gradient of distributions based on powers
   - B.2. The gradient of distributions based on logs
   - B.3. Divergence of radial norm-power distributions
-  - B.4. Divergence equal dirac delta
+  - B.4. The Laplacian of distributions based on powers
+  - B.5. Divergence equal dirac delta
+  - B.6. The Laplacian of the fundamental solution
 
 ## iv. References
 
@@ -1201,7 +1207,46 @@ lemma distDiv_norm_zpow_smul_repr_self_eq_smul
 
 /-!
 
-### B.4. Divergence equal dirac delta
+### B.4. The Laplacian of distributions based on powers
+
+-/
+
+lemma distLaplacian_distOfFunction_norm_zpow {d : ℕ} (m : ℤ)
+    (hm : - (d.succ - 1 : ℕ) + 1 ≤ m)
+    (hdiv : 0 < m - 2 + (d.succ : ℤ)) :
+    Δᵈ (distOfFunction (fun x : Space d.succ => ‖x‖ ^ m)
+      (IsDistBounded.pow m (by simp_all; omega))) =
+      (((m : ℝ) * (((m - 2 + (d.succ : ℤ) : ℤ) : ℝ))) •
+        distOfFunction (fun x : Space d.succ => ‖x‖ ^ (m - 2))
+          (IsDistBounded.pow (m - 2) (by omega))) := by
+  rw [distLaplacian]
+  change ∇ᵈ ⬝ (∇ᵈ (distOfFunction (fun x : Space d.succ => ‖x‖ ^ m)
+    (IsDistBounded.pow m (by simp_all; omega)))) = _
+  rw [distGrad_distOfFunction_norm_zpow m hm]
+  have hdist :
+      distOfFunction (fun x : Space d.succ => (m * ‖x‖ ^ (m - 2)) • basis.repr x)
+          (by
+            simp [← smul_smul]
+            refine IsDistBounded.const_fun_smul ?_ ↑m
+            apply IsDistBounded.zpow_smul_repr_self
+            simp_all
+            omega) =
+        (m : ℝ) • distOfFunction
+          (fun x : Space d.succ => ‖x‖ ^ (m - 2) • basis.repr x)
+          (IsDistBounded.zpow_smul_repr_self (m - 2) (by omega)) := by
+    convert distOfFunction_smul_fun
+      (fun x : Space d.succ => ‖x‖ ^ (m - 2) • basis.repr x)
+      (IsDistBounded.zpow_smul_repr_self (m - 2) (by omega)) (m : ℝ) using 1
+    ext x
+    simp [smul_smul]
+  rw [hdist]
+  rw [map_smul]
+  rw [distDiv_norm_zpow_smul_repr_self_eq_smul (m - 2) hdiv]
+  rw [smul_smul]
+
+/-!
+
+### B.5. Divergence equal dirac delta
 
 We show that the divergence of `x ↦ ‖x‖ ^ (- d) • x` is equal to a multiple of the Dirac delta
 at `0`.
@@ -1364,5 +1409,92 @@ lemma distDiv_inv_pow_eq_dim {d : ℕ} :
   rcases d with _ | d'
   · simp; rfl
   · exact distDiv_inv_pow_eq_dim'
+
+/-!
+
+### B.6. The Laplacian of the fundamental solution
+
+-/
+
+/-- In dimensions at least three, the distributional Laplacian of the fundamental-solution
+power of the norm is a multiple of the Dirac delta at the origin. -/
+lemma distLaplacian_fundamentalSolution_norm_zpow {d : ℕ} :
+    Δᵈ (distOfFunction (fun x : Space d.succ.succ.succ => ‖x‖ ^ (- (d.succ : ℤ)))
+      (IsDistBounded.pow (- (d.succ : ℤ)) (by omega))) =
+      ((- (d.succ : ℝ)) * (d.succ.succ.succ : ℝ) *
+        (volume (α := Space d.succ.succ.succ)).real (Metric.ball 0 1)) • diracDelta ℝ 0 := by
+  rw [distLaplacian]
+  change ∇ᵈ ⬝ (∇ᵈ (distOfFunction
+    (fun x : Space d.succ.succ.succ => ‖x‖ ^ (- (d.succ : ℤ)))
+    (IsDistBounded.pow (- (d.succ : ℤ)) (by omega)))) = _
+  rw [distGrad_distOfFunction_norm_zpow (- (d.succ : ℤ)) (by omega)]
+  simp only [Int.cast_neg, Int.cast_natCast]
+  have hdist :
+      distOfFunction
+        (fun x : Space d.succ.succ.succ =>
+          (- (d.succ : ℝ) * ‖x‖ ^ ((- (d.succ : ℤ)) - 2)) • basis.repr x)
+        (by
+          simpa [smul_smul] using
+            (IsDistBounded.const_fun_smul
+              (F := EuclideanSpace ℝ (Fin d.succ.succ.succ))
+              (IsDistBounded.zpow_smul_repr_self ((- (d.succ : ℤ)) - 2) (by omega))
+              (- (d.succ : ℝ)))) =
+        (- (d.succ : ℝ)) • distOfFunction
+          (fun x : Space d.succ.succ.succ =>
+            ‖x‖ ^ ((- (d.succ : ℤ)) - 2) • basis.repr x)
+          (IsDistBounded.zpow_smul_repr_self ((- (d.succ : ℤ)) - 2) (by omega)) := by
+    convert distOfFunction_smul_fun
+      (fun x : Space d.succ.succ.succ =>
+        ‖x‖ ^ ((- (d.succ : ℤ)) - 2) • basis.repr x)
+      (IsDistBounded.zpow_smul_repr_self ((- (d.succ : ℤ)) - 2) (by omega))
+      (- (d.succ : ℝ)) using 1
+    ext x
+    simp [smul_smul]
+  rw [hdist]
+  rw [map_smul]
+  have hdiv :
+      ∇ᵈ ⬝ (distOfFunction
+        (fun x : Space d.succ.succ.succ =>
+          ‖x‖ ^ ((- (d.succ : ℤ)) - 2) • basis.repr x)
+        (IsDistBounded.zpow_smul_repr_self ((- (d.succ : ℤ)) - 2) (by omega))) =
+        (d.succ.succ.succ * (volume (α := Space d.succ.succ.succ)).real
+          (Metric.ball 0 1)) • diracDelta ℝ 0 := by
+    convert distDiv_inv_pow_eq_dim (d := d.succ.succ.succ) using 1
+  rw [hdiv]
+  rw [smul_smul]
+  ring_nf
+
+/-- Version of `distLaplacian_fundamentalSolution_norm_zpow` stated using the dimension of
+the ambient space. -/
+lemma distLaplacian_fundamentalSolution_norm_zpow_of_three_le {d : ℕ} (hd : 3 ≤ d) :
+    Δᵈ (distOfFunction (fun x : Space d => ‖x‖ ^ ((2 : ℤ) - (d : ℤ)))
+      (IsDistBounded.pow ((2 : ℤ) - (d : ℤ)) (by omega))) =
+      (((2 : ℝ) - (d : ℝ)) * (d : ℝ) *
+        (volume (α := Space d)).real (Metric.ball 0 1)) • diracDelta ℝ 0 := by
+  rcases d with _ | _ | _ | d
+  · omega
+  · omega
+  · omega
+  · convert distLaplacian_fundamentalSolution_norm_zpow (d := d) using 1
+    ext x
+    simp only [ContinuousLinearMap.coe_smul', Pi.smul_apply, smul_eq_mul]
+    simp only [Nat.succ_eq_add_one, Nat.cast_add, Nat.cast_one]
+    ring_nf
+
+/-- Version of `distLaplacian_fundamentalSolution_norm_zpow` stated for every dimension.
+In dimensions less than three, the exponent is zero and both sides are zero. -/
+lemma distLaplacian_fundamentalSolution_norm_zpow_eq {d : ℕ} :
+    Δᵈ (distOfFunction (fun x : Space d => ‖x‖ ^ (- ((d - 2 : ℕ) : ℤ)))
+      (IsDistBounded.pow _ (by grind))) =
+      (- ((d - 2 : ℕ) : ℝ) * (d : ℝ) *
+        (volume (α := Space d)).real (Metric.ball 0 1)) • diracDelta ℝ 0 := by
+  by_cases hd : d < 3
+  · have hdim : d - 2 = 0 := by omega
+    simp [hdim]
+    exact distLaplacian_const 1
+  · convert distLaplacian_fundamentalSolution_norm_zpow_of_three_le
+      (d := d) (by grind) using 4 <;>
+      rw [Nat.cast_sub (by omega : 2 ≤ d)] <;>
+      ring_nf
 
 end Space
