@@ -6,6 +6,7 @@ Authors: Joseph Tooby-Smith
 module
 
 public import Physlib.SpaceAndTime.Space.Basic
+public import Physlib.SpaceAndTime.Space.Origin
 public import Mathlib.Geometry.Manifold.Diffeomorph
 public import Mathlib.Analysis.Distribution.TemperateGrowth
 public import Mathlib.MeasureTheory.Measure.Haar.InnerProductSpace
@@ -55,6 +56,9 @@ lemma zero_val {d : ℕ} : (0 : Space d).val = fun _ => 0 := rfl
 lemma zero_apply {d : ℕ} (i : Fin d) :
     (0 : Space d) i = 0 := by
   simp [zero_val]
+
+/-- The coordinate origin (`Space.origin`) is the zero of the vector-space structure. -/
+lemma origin_eq_zero {d : ℕ} : origin d = (0 : Space d) := rfl
 
 instance {d} : AddCommMonoid (Space d) where
   add_assoc a b c:= by

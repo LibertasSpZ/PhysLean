@@ -5,7 +5,7 @@ Authors: Shaopeng Zhu
 -/
 module
 
-public import Physlib.SpaceAndTime.Space.Basic
+public import Physlib.SpaceAndTime.Space.Origin
 public import Physlib.SpaceAndTime.Space.EuclideanGroup.AffineGroup
 
 /-!
@@ -31,20 +31,14 @@ endows the affine space of points `Space d` (`Space/Basic.lean`) with a `MulActi
 defined relative to the coordinate basepoint `Space.origin d`:
 
 `g • p = (g.linear • (p -ᵥ Space.origin d) + g.translation) +ᵥ Space.origin d`.
+
+The basepoint `Space.origin` and the chart `Space.chartEuclidean` are defined in
+`Space/Origin.lean`.
 -/
 
 @[expose] public section
 
 variable {d : ℕ}
-
-namespace Space
-
-/-- The coordinate origin of `Space d`, used as the basepoint for the Euclidean action. -/
-def origin (d : ℕ) : Space d := ⟨0⟩
-
-@[simp] lemma origin_apply (d : ℕ) (i : Fin d) : (origin d) i = 0 := rfl
-
-end Space
 
 namespace EuclideanGroup
 
@@ -133,18 +127,9 @@ lemma rotation_dist_smul (r : RotationGroup d) (p q : Space d) :
 
 /-! ## Part 3: relation to the affine isometry action (optional bridge)
 
-Under the standard chart `Space.chartEuclidean`, `p ↦ p -ᵥ origin`, the action of Part 1 is the
-transport of `toAffineIsometryMulEquiv` (`AffineGroup.lean`) from `EuclideanSpace` to `Space`.
-Nothing in Parts 1–2 depends on this section; it is a compatibility bridge for downstream use. -/
-
-/-- The standard chart `Space d ≃ᵃⁱ[ℝ] EuclideanSpace ℝ (Fin d)`, `p ↦ p -ᵥ origin`, identifying a
-point with its coordinate vector relative to the origin. -/
-noncomputable def _root_.Space.chartEuclidean (d : ℕ) :
-    Space d ≃ᵃⁱ[ℝ] EuclideanSpace ℝ (Fin d) :=
-  (AffineIsometryEquiv.vaddConst ℝ (Space.origin d)).symm
-
-@[simp] lemma _root_.Space.chartEuclidean_apply (d : ℕ) (p : Space d) :
-    Space.chartEuclidean d p = p -ᵥ Space.origin d := rfl
+`chartEuclidean_smul` records that, under the chart `Space.chartEuclidean` (`Space/Origin.lean`),
+`p ↦ p -ᵥ origin`, the Part 1 action is the transport of `toAffineIsometryMulEquiv`
+(`AffineGroup.lean`) from `EuclideanSpace` to `Space`. Nothing in Parts 1–2 depends on it. -/
 
 /-- **The unification bridge.** Under the standard chart, the Euclidean action on `Space d` is the
 transport of `toAffineIsometryMulEquiv` acting on `EuclideanSpace`:
