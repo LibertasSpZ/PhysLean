@@ -27,13 +27,12 @@ endows the affine space of points `Space d` (`Space/Basic.lean`) with a `MulActi
 
 ## Implementation notes
 
-`Space d` is an affine space (`NormedAddTorsor`) with no canonical origin, so the action is
-defined relative to the coordinate basepoint `Space.origin d`:
+`Space d` is an affine space (`NormedAddTorsor`) with no canonical origin, so the action uses its
+vector-space zero `(0 : Space d)` as the basepoint:
 
-`g • p = (g.linear • (p -ᵥ Space.origin d) + g.translation) +ᵥ Space.origin d`.
+`g • p = (g.linear • (p -ᵥ (0 : Space d)) + g.translation) +ᵥ (0 : Space d)`.
 
-The basepoint `Space.origin` and the chart `Space.chartEuclidean` are defined in
-`Space/Origin.lean`.
+The `Zero` instance and the chart `Space.chartEuclidean` are defined in `Space/Origin.lean`.
 -/
 
 @[expose] public section
@@ -50,30 +49,30 @@ reduce to the semidirect-product group law of `EuclideanGroup`. -/
 /-- The action of the Euclidean group on the affine space of points `Space d`: `g = ⟨t, Q⟩` rotates
 `p` about the coordinate origin by the orthogonal part `Q` and then translates by `t`. -/
 noncomputable instance : MulAction (EuclideanGroup d) (Space d) where
-  smul g p := (g.linear • (p -ᵥ Space.origin d) + g.translation) +ᵥ Space.origin d
+  smul g p := (g.linear • (p -ᵥ (0 : Space d)) + g.translation) +ᵥ (0 : Space d)
   one_smul p := by
-    show ((1 : Matrix.orthogonalGroup (Fin d) ℝ) • (p -ᵥ Space.origin d) + 0) +ᵥ Space.origin d = p
+    show ((1 : Matrix.orthogonalGroup (Fin d) ℝ) • (p -ᵥ (0 : Space d)) + 0) +ᵥ (0 : Space d) = p
     simp
   mul_smul g h p := by
-      show (((g * h).linear • (p -ᵥ Space.origin d) + (g * h).translation) +ᵥ Space.origin d)
-        = (((g.linear • (((h.linear • (p -ᵥ Space.origin d) + h.translation) +ᵥ Space.origin d)
-              -ᵥ Space.origin d))
-            + g.translation) +ᵥ Space.origin d)
+      show (((g * h).linear • (p -ᵥ (0 : Space d)) + (g * h).translation) +ᵥ (0 : Space d))
+        = (((g.linear • (((h.linear • (p -ᵥ (0 : Space d)) + h.translation) +ᵥ (0 : Space d))
+              -ᵥ (0 : Space d)))
+            + g.translation) +ᵥ (0 : Space d))
       simp [vadd_vsub, add_comm, add_assoc, mul_smul]
 
 /-- Coordinate formula for the action: `(g • p) i = (Q • (p -ᵥ origin)) i + t i`. -/
 @[simp] lemma smul_apply (g : EuclideanGroup d) (p : Space d) (i : Fin d) :
-    (g • p) i = (g.linear • (p -ᵥ Space.origin d)) i + g.translation i := by
-  show ((g.linear • (p -ᵥ Space.origin d) + g.translation) +ᵥ Space.origin d) i
-    = (g.linear • (p -ᵥ Space.origin d)) i + g.translation i
+    (g • p) i = (g.linear • (p -ᵥ (0 : Space d))) i + g.translation i := by
+  show ((g.linear • (p -ᵥ (0 : Space d)) + g.translation) +ᵥ (0 : Space d)) i
+    = (g.linear • (p -ᵥ (0 : Space d))) i + g.translation i
   simp [Space.vadd_apply]
 
 /-- The displacement between two points transforms by the **orthogonal part alone**: the
 translation cancels. This is the key lemma behind `dist_smul`. -/
 @[simp] lemma smul_vsub_smul (g : EuclideanGroup d) (p q : Space d) :
     (g • p) -ᵥ (g • q) = g.linear • (p -ᵥ q) := by
-  show ((g.linear • (p -ᵥ Space.origin d) + g.translation) +ᵥ Space.origin d)
-      -ᵥ ((g.linear • (q -ᵥ Space.origin d) + g.translation) +ᵥ Space.origin d)
+  show ((g.linear • (p -ᵥ (0 : Space d)) + g.translation) +ᵥ (0 : Space d))
+      -ᵥ ((g.linear • (q -ᵥ (0 : Space d)) + g.translation) +ᵥ (0 : Space d))
     = g.linear • (p -ᵥ q)
   rw [vadd_vsub_vadd_cancel_right, add_sub_add_right_eq_sub, ← smul_sub,
     vsub_sub_vsub_cancel_right]
@@ -98,24 +97,24 @@ preserve distance. -/
 @[simp] lemma rotation_smul_eq (r : RotationGroup d) (p : Space d) :
     r • p = (r : EuclideanGroup d) • p := rfl
 
-/-- A rotation fixes the coordinate origin: its translation part vanishes
-(`RotationGroup ≤ OriginStabilizer`), so `↑r • origin = origin`. Stated in the `↑r` form (the simp
-normal form of `r • _`, via `rotation_smul_eq`) so it is a well-formed `simp` lemma. -/
+/-- A rotation fixes the origin: its translation part vanishes
+(`RotationGroup ≤ OriginStabilizer`), so `↑r • 0 = 0`. Stated in the `↑r` form (the simp normal
+form of `r • _`, via `rotation_smul_eq`) so it is a well-formed `simp` lemma. -/
 @[simp] lemma rotation_smul_origin (r : RotationGroup d) :
-    (r : EuclideanGroup d) • Space.origin d = Space.origin d := by
+    (r : EuclideanGroup d) • (0 : Space d) = (0 : Space d) := by
   have h_trans : (r : EuclideanGroup d).translation = 0 := by
     apply r.property.right
-  have h_rot : (r : EuclideanGroup d) • (Space.origin d) =
-      ((r : EuclideanGroup d).linear • (0 : EuclideanSpace ℝ (Fin d)) + 0) +ᵥ (Space.origin d) := by
-    show ((r : EuclideanGroup d).linear • (Space.origin d -ᵥ Space.origin d)
-        + (r : EuclideanGroup d).translation) +ᵥ Space.origin d = _
+  have h_rot : (r : EuclideanGroup d) • ((0 : Space d)) =
+      ((r : EuclideanGroup d).linear • (0 : EuclideanSpace ℝ (Fin d)) + 0) +ᵥ ((0 : Space d)) := by
+    show ((r : EuclideanGroup d).linear • ((0 : Space d) -ᵥ (0 : Space d))
+        + (r : EuclideanGroup d).translation) +ᵥ (0 : Space d) = _
     rw [vsub_self, h_trans]
   simp [h_rot]
 
 /-- A rotation acts on the displacement from the origin by its orthogonal part, for every `p`:
 `(r • p) -ᵥ origin = Q • (p -ᵥ origin)`. -/
 lemma rotation_smul_vsub_origin (r : RotationGroup d) (p : Space d) :
-    (r • p) -ᵥ Space.origin d = (r : EuclideanGroup d).linear • (p -ᵥ Space.origin d) := by
+    (r • p) -ᵥ (0 : Space d) = (r : EuclideanGroup d).linear • (p -ᵥ (0 : Space d)) := by
   rw [rotation_smul_eq]
   nth_rewrite 1 [← rotation_smul_origin r]
   rw [smul_vsub_smul]
@@ -138,11 +137,11 @@ lemma chartEuclidean_smul (g : EuclideanGroup d) (p : Space d) :
     Space.chartEuclidean d (g • p) = toAffineIsometryMulEquiv g (Space.chartEuclidean d p) := by
   rw [Space.chartEuclidean_apply]
   rw [toAffineIsometryMulEquiv_apply, toAffineIsometryHom_apply]
-  have h_left : g • p -ᵥ Space.origin d = g.linear • (p -ᵥ Space.origin d) + g.translation := by
+  have h_left : g • p -ᵥ (0 : Space d) = g.linear • (p -ᵥ (0 : Space d)) + g.translation := by
     exact
-      (eq_vadd_iff_vsub_eq (g • p) (g.linear • (p -ᵥ Space.origin d) + g.translation)
-            (Space.origin d)).mp
+      (eq_vadd_iff_vsub_eq (g • p) (g.linear • (p -ᵥ (0 : Space d)) + g.translation)
+            ((0 : Space d))).mp
         rfl
   simp [h_left]
-  exact add_comm' (g.linear • (p -ᵥ Space.origin d)) g.translation
+  exact add_comm' (g.linear • (p -ᵥ (0 : Space d))) g.translation
 end EuclideanGroup
